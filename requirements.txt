@@ -1,0 +1,12 @@
+langgraph
+langchain-core
+langchain-ollama
+pydantic
+python-dotenv
+PyMuPDF
+pytest
+docker
+requests
+pandas
+matplotlib
+psycopg2-binary

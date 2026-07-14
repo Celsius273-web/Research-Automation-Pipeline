@@ -1,0 +1,28 @@
+---
+description: Core engineering standards applied to every request
+alwaysApply: true
+---
+
+# Core engineering standards
+
+## Testing
+- Every function with real logic gets a test that exercises actual behavior, not a mock that always passes.
+- Assert on outcomes, not on implementation details like internal call counts.
+- Do not write a test that only checks a function does not throw an exception.
+
+## Comments
+- Comment why a decision was made, not what the line does.
+- Do not restate the function name in a comment above it.
+- Delete commented out code. Do not leave it in place.
+
+## Structure
+- One function does one job. Extract any function longer than 30 to 40 lines, including nested closures returned by a factory function.
+- One file does one job. Split a file once it holds more than one clear responsibility (e.g. CLI argument parsing, persistence, interactive prompts, and orchestration logic each belong in their own module).
+- Before adding another responsibility to a file, check its current line count. A file that has crossed roughly 300 lines and keeps growing is a signal to split it, not to keep appending.
+- Name booleans with is, has, or should. Name functions as verbs. Name collections as plurals.
+
+## Behavior
+- Search the codebase for an existing function or pattern before writing a new one.
+- Make the smallest change that solves the problem. Do not refactor unrelated code in the same pass.
+- Do not invent APIs, libraries, or function signatures. Check before assuming something exists.
+- Never duplicate the same magic number or default (retry limits, timeouts, tolerances) across multiple files. Define it once in `src/config.py` and import it.

@@ -1,0 +1,54 @@
+Section: Abstract
+
+{
+  "research_question": "How can pre-training Gaussian process priors on multi-task data improve Bayesian optimization efficiency for hyperparameter tuning?",
+  "methodology": "HyperBO uses a KL divergence-based loss to pre-train GP priors on related tasks, then fixes the prior in downstream BO steps without re-training.",
+  "datasets_or_benchmarks": ["multi-task hyperparameter tuning dataset (PD1)", "HPO-B benchmarks"],
+  "variables": ["GP prior mean and kernel", "posterior variance scaling", "KL divergence loss"],
+  "evaluation_metrics": ["regret", "hyperparameter tuning efficiency relative to competing methods"],
+  "hyperparameters": {},
+  "reported_results": [
+    {
+      "benchmark": "new multi-task HPO dataset and existing BO benchmarks",
+      "metric_name": "efficiency gain over best competing methods",
+      "value": "at least 3x faster",
+      "source": "abstract"
+    }
+  ],
+  "notes": "Abstract provides only high-level claims; concrete hyperparameters and experimental details are in later sections."
+}
+
+
+Section: Method
+
+{
+  "research_question": "How can pre-training Gaussian process priors on multi-task data improve Bayesian optimization efficiency for hyperparameter tuning?",
+  "methodology": "Pre-train GP mean (neural network) and kernel (Matern52) using KL divergence loss on multi-task data. Freeze the pre-trained GP and use PI acquisition function for downstream BO.",
+  "datasets_or_benchmarks": [],
+  "variables": ["GP mean network output", "Matern52 kernel", "probability of improvement acquisition"],
+  "evaluation_metrics": ["posterior mean convergence", "posterior variance scaling"],
+  "hyperparameters": {
+    "mean_network_architecture": "2-hidden-layer NN with 32 units, tanh activation",
+    "kernel_type": "Anisotropic Matern52 on last feature layer",
+    "optimizer": "Adam via Optax",
+    "learning_rate": "1e-3",
+    "training_steps": "50000",
+    "batch_size": "50"
+  },
+  "reported_results": [
+    {
+      "benchmark": "theoretical bounds",
+      "metric_name": "posterior mean alignment",
+      "value": "E[mu_hat(x)] = mu*(x)",
+      "source": "method section theoretical analysis"
+    },
+    {
+      "benchmark": "theoretical bounds",
+      "metric_name": "posterior variance scaling",
+      "value": "E[k_hat(x)] = (N-t)/N * k*(x)",
+      "source": "method section theoretical analysis"
+    }
+  ],
+  "notes": "Method section defines the core algorithm and theoretical properties but does not provide all experimental configuration details."
+}
+

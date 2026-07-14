@@ -1,0 +1,15 @@
+---
+description: Test quality standards
+globs: ["tests/**/*.py", "**/test_*.py"]
+alwaysApply: false
+---
+
+# Test quality
+
+- Test one behavior per test function. Name the test after the behavior, not after the function under test.
+- Use realistic fixture data, not empty dicts or placeholder strings, unless the test is specifically about empty input.
+- For agent or LLM-calling code, test the parsing and validation logic against fixed sample outputs. Do not write a test that calls a live model.
+- For Docker or subprocess-backed tools, mock the SDK/client boundary (e.g. the `docker` client) and assert on the command, image, and volumes passed to it. Never require a real Docker daemon or container run for a unit test.
+- A test that could never catch a real bug is not worth keeping. If you cannot describe the bug it would catch, cut it.
+- New test files mirror the `src/` package layout under `tests/` (e.g. `src/tools/foo.py` -> `tests/tools/test_foo.py`) so coverage stays easy to locate as the codebase grows.
+- When a module is split or renamed, move and update its tests in the same change; do not leave tests patching a module path that no longer owns that logic.

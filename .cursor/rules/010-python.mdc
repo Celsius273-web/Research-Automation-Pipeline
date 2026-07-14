@@ -1,0 +1,16 @@
+---
+description: Python conventions for this project
+globs: ["**/*.py"]
+alwaysApply: false
+---
+
+# Python conventions
+
+- Type hints on every function signature, including the return type.
+- Docstrings only on public functions and classes, one line if the name already makes the purpose clear.
+- Use pathlib, not raw string paths.
+- Wrap external calls, LLM calls, subprocess calls, file IO, in a named function. Never inline them in business logic. This keeps them easy to mock in tests.
+- Raise specific exceptions with a clear message. Do not catch a bare Exception unless re-raising or logging and re-raising.
+- When swallowing an exception on purpose (e.g. best-effort cleanup in a `finally` block), catch the narrowest type the library documents, not a bare `Exception`, and leave a comment explaining why the failure is safe to ignore.
+- Config values live in one place, config.py or environment variables. Never hardcode them inline, including retry counts, timeouts, and tolerance thresholds.
+- Prefer plain functions over classes. Only use a class (or `@dataclass`) when there is real state to hold across calls, such as a client handle or a cache; stateless logic should be a module-level function.

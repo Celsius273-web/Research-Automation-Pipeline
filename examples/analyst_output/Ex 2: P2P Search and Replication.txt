@@ -1,0 +1,92 @@
+Section: Abstract
+
+{
+  "research_question": "How can search and replication algorithms improve scalability of decentralized, unstructured peer-to-peer networks like Gnutella?",
+  "methodology": "Simulation study of alternative query algorithms, data replication strategies, and network topologies to address flooding-based query inefficiency.",
+  "datasets_or_benchmarks": ["simulated P2P networks with 4736-10000 nodes", "Gnutella topology October 2000", "power-law random graphs", "uniform random graphs", "2D grid topology"],
+  "variables": ["network topology", "query distribution", "replication strategy", "TTL (time-to-live)"],
+  "evaluation_metrics": ["probability of success", "number of hops", "average messages per node", "peak messages at busiest node", "message duplication percentage"],
+  "hyperparameters": {},
+  "reported_results": [
+    {
+      "benchmark": "Gnutella flooding baseline",
+      "metric_name": "message overhead reduction",
+      "value": "two orders of magnitude in many cases",
+      "source": "abstract"
+    }
+  ],
+  "notes": "Abstract describes the problem and high-level contributions; specific algorithm parameters and detailed results appear in later sections."
+}
+
+Section: Methodology
+
+{
+    "research_question": "How can search and replication algorithms improve scalability of decentralized, unstructured peer-to-peer networks like Gnutella?",
+    "methodology": "Simulations comparing three search algorithms (flooding, expanding ring, k-walker random walk) and three replication strategies (uniform, proportional, square-root) across four network topologies.",
+    "datasets_or_benchmarks": ["Power-Law Random Graph (PLRG) 9230 nodes", "Random Graph (GT-ITM) 9836 nodes", "Gnutella snapshot (Oct 2000) 4736 nodes", "2D Grid 10000 nodes (100x100)"],
+    "variables": ["search algorithm type", "number of walkers", "TTL value", "replication ratio", "query distribution (uniform vs Zipf-like)"],
+    "evaluation_metrics": ["Pr(success)", "hops", "msgs per node", "nodes visited", "message duplication percentage", "peak msgs"],
+    "hyperparameters": {
+      "query_distribution_zipf_alpha": "0.8, 1.2, or 2.4",
+      "number_of_simulation_objects": "100",
+      "average_replication_ratio": "1.0%",
+      "num_place": "10 (replica placement sets)",
+      "num_query": "100 (queries per object per placement)"
+    },
+    "reported_results": [
+      {
+        "benchmark": "Random Graph topology",
+        "metric_name": "32-walker random walk message overhead reduction vs flooding",
+        "value": "two orders of magnitude",
+        "source": "Section 3 results"
+      }
+    ],
+    "notes": "Methodology section defines the simulation framework, network topologies, query/replication distributions, and metrics, but defers detailed algorithm descriptions to later sections."
+  }
+
+  {
+    "research_question": "How can search and replication algorithms improve scalability of decentralized, unstructured peer-to-peer networks like Gnutella?",
+    "methodology": "Simulation-based comparison of search and replication strategies.",
+    "datasets_or_benchmarks": ["Random Graph 9836 nodes", "Power-Law Random Graph 9230 nodes", "Gnutella 4736 nodes", "Grid 10000 nodes"],
+    "variables": ["number of walkers (1, 4, 8, 16, 32, 64)", "termination mechanism (TTL vs checking)", "state keeping (yes/no)"],
+    "evaluation_metrics": ["number of hops", "average messages per node", "nodes visited", "peak messages"],
+    "hyperparameters": {
+      "walker_count_tested": "1, 4, 8, 16, 32, 64",
+      "check_interval": "every 4th step",
+      "flooding_ttl": "5 (PLRG, Gnutella), 8 (Random), 32 (Grid)",
+      "expanding_ring_ttl_increment": "2",
+      "dynamic_simulation_duration": "10000 seconds",
+      "warmup_queries": "first 5000 seconds",
+      "snapshot_interval": "every 2000 queries",
+      "max_objects_per_node": "40",
+      "query_rate": "5 queries per second",
+      "replica_replacement_policy": "random deletion"
+    },
+    "reported_results": [
+      {
+        "benchmark": "Random Graph",
+        "metric_name": "32-walker random walk avg msgs per node (uniform distribution)",
+        "value": "0.031 vs 2.509 (flooding)",
+        "source": "Table 2"
+      },
+      {
+        "benchmark": "Random Graph",
+        "metric_name": "32-walker random walk hops (uniform distribution)",
+        "value": "7.00 vs 3.40 (flooding)",
+        "source": "Table 2"
+      },
+      {
+        "benchmark": "PLRG",
+        "metric_name": "path replication avg msgs per node",
+        "value": "19155.5 vs 56542.6 (owner replication)",
+        "source": "Table 7"
+      },
+      {
+        "benchmark": "PLRG",
+        "metric_name": "path replication factor of improvement",
+        "value": "2.95x",
+        "source": "Table 7"
+      }
+    ],
+    "notes": "Experiments show that 32-walker random walk with state keeping performs best; square-root replication approximated by both path and random replication strategies."
+  }

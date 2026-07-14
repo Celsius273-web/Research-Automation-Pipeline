@@ -1,0 +1,61 @@
+---
+description: Repo structure and architectural conventions for the Research Assistant pipeline
+alwaysApply: true
+---
+
+# Repo structure
+
+```
+src/
+  config.py            # All tunables: paths, model names, timeouts, retry limits, tolerances.
+  state.py             # Single source of truth for every Pydantic model + the ResearchState TypedDict.
+  main.py              # CLI only: argparse wiring and thin run_* command handlers. No business logic.
+  persistence.py        # Read/write of JSON artifacts (extractions, plans, run summaries, reports).
+  review_prompts.py     # Interactive stdin/stdout checkpoints (Analyst/Planner/Engineer review).
+  pipeline_nodes.py     # LangGraph node factories that glue agents + state together.
+  agents/              # One file per agent (analyst, planner, engineer, executor, reviewer).
+  graphs/research_graph.py  # build_phaseN_graph() functions wiring nodes into LangGraph StateGraphs.
+  tools/               # Deterministic, agent-agnostic helpers (docker_executor, language_detect,
+                       # pdf_parser, result_comparator, report_builder). No LLM calls here.
+docker/                # One Dockerfile per supported execution language.
+examples/              # Example files
+  /analyst_output       # example output of what the analyst agent should be producing
+tests/                 # Mirrors src/ 1:1 (tests/agents, tests/graphs, tests/tools, ...).
+data/                  # Runtime artifacts only (extractions, plans, runs, reports). Never committed logic.
+```
+
+## Layering rules
+- `main.py` may import from every other module, but nothing should import from `main.py`. If another
+  module needs a function currently in `main.py`, that function belongs in `persistence.py`,
+  `review_prompts.py`, or `pipeline_nodes.py` instead.
+- `tools/` functions must stay pure/deterministic and framework-agnostic: no Ollama calls, no
+  `ResearchState` references. Agents call tools, not the other way around.
+- `agents/*.py` own their `SYSTEM_PROMPT`, payload normalization, and Pydantic validation for exactly
+  one agent. An agent module does not know about LangGraph or `ResearchState`.
+- `pipeline_nodes.py` is the only place that translates between `ResearchState` and agent method calls.
+  Keep each node function focused on one agent's turn; extract a helper when a node needs more than
+  one clear step (e.g. building failure context, checking captured metrics).
+- `graphs/research_graph.py` only wires nodes and routing functions together. It never contains agent
+  or persistence logic itself.
+
+## Agent module pattern
+Every LLM-backed agent (`analyst`, `planner`, `engineer`, `reviewer`) follows the same shape so the
+pipeline stays predictable:
+1. A `SYSTEM_PROMPT` constant describing the expected JSON schema.
+2. A `@dataclass` agent class holding config (model name, retry count) as fields, not globals.
+3. A private `_call_ollama(...)` (or shared helper) that performs the HTTP call and JSON parsing.
+4. A `_normalize_*_payload(...)` function that coerces raw LLM JSON into the exact shape the Pydantic
+   model expects before validation.
+5. A public method (`extract`, `build_plan`, `propose_patch`, `generate_report`) that retries on
+   validation failure with backoff and raises a `RuntimeError` with a clear message after exhausting
+   retries.
+
+`executor.py` is the exception: it is deterministic (no LLM), but still follows the dataclass-with-config
+shape and keeps Docker interaction behind `tools/docker_executor.py`.
+
+## Graph phases
+`research_graph.py` exposes `build_phase1_graph` through `build_phase4_graph`, each a strict superset of
+the previous phase's nodes (Analyst -> Planner -> Engineer/Executor retry loop -> Reviewer). When adding a
+new phase or terminal branch, route it through the existing conditional-edge functions rather than adding
+a parallel graph-building path, and make sure every terminal branch still reaches a state the CLI can
+persist.
