@@ -7,9 +7,11 @@ from src.agents.engineer import PaperEngineer
 from src.agents.executor import ExecutorAgent
 from src.agents.planner import PaperPlanner
 from src.agents.reviewer import PaperReviewer
+from src.bundle import PaperBundle
 from src.config import EXECUTOR_TIMEOUT_SECONDS, MAX_RETRY_ATTEMPTS, ROOT_DIR, RUNS_DIR
 from src.review_prompts import run_cli_engineer_review, run_cli_plan_review, run_cli_review
 from src.state import (
+    AgentEnvelope,
     EngineerInputContext,
     EngineerOutput,
     EngineerReviewRecord,
@@ -17,8 +19,10 @@ from src.state import (
     ExecutorResult,
     FailureContext,
     PlannerInputContext,
+    PlannerPayload,
     PlanReviewRecord,
     PlanStep,
+    PlanStepCore,
     ReportedResult,
     ResearchState,
     ReviewRecord,
@@ -66,12 +70,67 @@ def make_planner_node(non_interactive: bool):
     planner = PaperPlanner()
 
     def planner_node(state: ResearchState) -> ResearchState:
+        paper = state["paper"]
+        paper_bundle = PaperBundle(paper.paper_id)
+        
+        # Load extraction from state, or from disk if plan-only flow
+        if "extraction" not in state:
+            extraction = paper_bundle.get_extraction()
+            if not extraction:
+                state["errors"].append("No extraction found for paper; run analyst first")
+                return state
+        else:
+            extraction = state["extraction"]
+        
+        # #region DEBUG: Log extraction state (H1)
+        import json
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info("PLANNER_NODE_EXTRACTION_DEBUG: extraction type=%s, merged=%s, by_section keys=%s", 
+                    type(extraction).__name__,
+                    "None" if extraction.merged is None else f"research_q={bool(extraction.merged.research_question)}, vars={len(extraction.merged.variables)}, hyper={len(extraction.merged.hyperparameters)}",
+                    list(extraction.by_section.keys()) if extraction.by_section else "None")
+        # #endregion
+        
+        # Load rich context from paper bundle
+        repo_context = paper_bundle.get_repo_info()
+        repo_setup_guide = paper_bundle.get_setup_guide()
+        hyperparameter_reference = paper_bundle.get_hyperparameter_reference()
+        
+        # Convert repo_context to dict for backwards compatibility
+        repo_context_dict = {
+            "repo_url": repo_context.repo_url,
+            "repo_path": repo_context.repo_path,
+            "language": repo_context.language,
+            "build_system": repo_context.build_system,
+            "notes": repo_context.notes,
+        }
+        
+        # #region DEBUG: Log context being built (H2, H3)
+        logger.info("PLANNER_CONTEXT_BUILD: merged has research_q=%s, %d vars, %d hyper; by_section has %d sections",
+                    bool(extraction.merged.research_question) if extraction.merged else "None",
+                    len(extraction.merged.variables) if extraction.merged else 0,
+                    len(extraction.merged.hyperparameters) if extraction.merged else 0,
+                    len(extraction.by_section) if extraction.by_section else 0)
+        # #endregion
+        
         context = PlannerInputContext(
-            paper=state["paper"],
-            approved_extraction=state["approved_extraction"],
+            paper=paper,
+            approved_extraction=extraction.merged,
+            extraction_sections=extraction.by_section,
             runtime_constraints=default_runtime_constraints(),
-            repo_context={},
+            repo_context=repo_context_dict,
+            repo_setup_guide=repo_setup_guide,
+            hyperparameter_reference=hyperparameter_reference,
+            extraction_file_path=str(paper_bundle.extraction_path),
+            paper_bundle_path=str(paper_bundle.bundle_dir),
         )
+        
+        # #region DEBUG: Log context passed to planner (H3)
+        logger.info("PLANNER_CONTEXT_READY: extraction_sections in context=%s, has %d sections",
+                    bool(context.extraction_sections),
+                    len(context.extraction_sections) if context.extraction_sections else 0)
+        # #endregion
         try:
             plan = planner.build_plan(context)
         except RuntimeError as exc:
@@ -108,10 +167,16 @@ def make_reviewer_node(reported_results: list[ReportedResult]):
             "language": state["repo_context"].language,
             "build_system": state["repo_context"].build_system,
         }
+        
+        if isinstance(execution_plan, ExecutionPlan):
+            domain = execution_plan.domain
+        else:
+            domain = execution_plan.payload.core.domain
+            
         try:
             report = reviewer.generate_report(
                 paper_id=state["paper"].paper_id,
-                domain=execution_plan.domain,
+                domain=domain,
                 reported_results=reported_results,
                 captured_metrics=state["executor_result"].captured_metrics,
                 run_summary=run_summary,
@@ -138,32 +203,8 @@ def _build_failure_context(state: ResearchState) -> FailureContext | None:
     )
 
 
-def _run_executor_attempt(
-    executor: ExecutorAgent,
-    state: ResearchState,
-    step: PlanStep,
-    output: EngineerOutput,
-    commands: list[str],
-    attempt_number: int,
-) -> ExecutorResult:
-    try:
-        executor.apply_patches(state["repo_context"], output)
-        return executor.execute_step(
-            paper_id=state["paper"].paper_id,
-            step_id=step.step_id or "step_1",
-            repo_context=state["repo_context"],
-            verification_commands=commands,
-            current_attempt=attempt_number,
-            results_path=step.results_path,
-            timeout_seconds=EXECUTOR_TIMEOUT_SECONDS,
-        )
-    except RuntimeError as exc:
-        state["errors"].append(str(exc))
-        return ExecutorResult(final_status="failed", total_attempts=attempt_number)
-
-
 def make_engineer_executor_nodes(
-    execution_plan: ExecutionPlan,
+    execution_plan: ExecutionPlan | AgentEnvelope[PlannerPayload],
     runtime_constraints: dict[str, str],
     non_interactive: bool,
 ):
@@ -172,10 +213,15 @@ def make_engineer_executor_nodes(
     executor = ExecutorAgent(project_root=ROOT_DIR, runs_dir=RUNS_DIR, docker_executor=docker_executor)
 
     def engineer_node(state: ResearchState) -> ResearchState:
-        if not execution_plan.steps:
+        if isinstance(execution_plan, ExecutionPlan):
+            steps = execution_plan.steps
+        else:
+            steps = execution_plan.payload.core.steps
+            
+        if not steps:
             state["errors"].append("Execution plan has no steps to run.")
             return state
-        step = execution_plan.steps[0]
+        step = steps[0]
         context = EngineerInputContext(
             paper=state["paper"],
             execution_plan=execution_plan,
@@ -212,15 +258,39 @@ def make_engineer_executor_nodes(
             return state
 
         output = state["engineer_output"]
-        step = execution_plan.steps[0]
-        commands = step.verification or output.verification_commands
+        if isinstance(execution_plan, ExecutionPlan):
+            step = execution_plan.steps[0]
+            commands = step.verification or output.verification_commands
+            results_path = step.results_path
+            step_id = step.step_id
+        else:
+            step = execution_plan.payload.core.steps[0]
+            # Convert run_command string to a list, or use engineer's verification commands
+            commands = [step.run_command] if step.run_command else output.verification_commands
+            results_path = step.results_path
+            step_id = step.step_id
+
         if not commands:
             state["errors"].append("No verification commands available for executor.")
             state["executor_result"].final_status = "failed"
             return state
 
         attempt_number = int(state.get("retry_count", 0)) + 1
-        result = _run_executor_attempt(executor, state, step, output, commands, attempt_number)
+        
+        try:
+            executor.apply_patches(state["repo_context"], output)
+            result = executor.execute_step(
+                paper_id=state["paper"].paper_id,
+                step_id=step_id or "step_1",
+                repo_context=state["repo_context"],
+                verification_commands=commands,
+                current_attempt=attempt_number,
+                results_path=results_path,
+                timeout_seconds=EXECUTOR_TIMEOUT_SECONDS,
+            )
+        except RuntimeError as exc:
+            state["errors"].append(str(exc))
+            result = ExecutorResult(final_status="failed", total_attempts=attempt_number)
 
         existing = state["executor_result"].attempts
         result.attempts = existing + result.attempts
@@ -233,7 +303,7 @@ def make_engineer_executor_nodes(
         elif not result.captured_metrics:
             state["errors"].append(
                 "Step succeeded but no results metrics were captured"
-                f" (results_path='{step.results_path or '<unset>'}')."
+                f" (results_path='{results_path or '<unset>'}')."
             )
         state["executor_result"] = result
         return state

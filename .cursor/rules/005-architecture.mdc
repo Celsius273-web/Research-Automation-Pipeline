@@ -19,6 +19,7 @@ src/
                        # pdf_parser, result_comparator, report_builder). No LLM calls here.
 docker/                # One Dockerfile per supported execution language.
 examples/              # Example files
+md/                    # here is where I put md files that are used for development
   /analyst_output       # example output of what the analyst agent should be producing
 tests/                 # Mirrors src/ 1:1 (tests/agents, tests/graphs, tests/tools, ...).
 data/                  # Runtime artifacts only (extractions, plans, runs, reports). Never committed logic.

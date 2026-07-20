@@ -7,7 +7,7 @@ venv/
 *.egg-info/
 
 data/
-
+md/
 .env
 *.env
 
@@ -15,3 +15,10 @@ data/
 *.egg-info/
 
 *.sqlite3
+/examples
+.pytest_cache/
+.cursor/
+.vscode/
+.idea/
+.cursor/
+.cursor/

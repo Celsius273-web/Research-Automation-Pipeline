@@ -11,12 +11,17 @@ load_dotenv()
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT_DIR / "data"
+
+# Primary bundle directory - papers stored with all artifacts colocated
 PAPERS_DIR = DATA_DIR / "papers"
-PAPER_BUNDLES_DIR = PAPERS_DIR  # Alias for ingestion pipeline
+PAPER_BUNDLES_DIR = PAPERS_DIR  # Primary artifact location
+
+# Legacy directories - maintained for backward compatibility
 EXTRACTIONS_DIR = DATA_DIR / "extractions"
 PLANS_DIR = DATA_DIR / "plans"
 RUNS_DIR = DATA_DIR / "runs"
 REPORTS_DIR = DATA_DIR / "reports"
+
 FIXTURES_DIR = ROOT_DIR / "tests" / "fixtures"
 
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
@@ -41,6 +46,9 @@ ANALYST_SECTION_CHARS = int(os.getenv("ANALYST_SECTION_CHARS", "12000"))
 
 REVIEW_MATCH_TOLERANCE_PCT = float(os.getenv("REVIEW_MATCH_TOLERANCE_PCT", "5.0"))
 REVIEW_CLOSE_TOLERANCE_PCT = float(os.getenv("REVIEW_CLOSE_TOLERANCE_PCT", "20.0"))
+
+# Agent reasoning and retry configuration.
+PLANNER_MAX_RETRIES = int(os.getenv("PLANNER_MAX_RETRIES", "3"))
 
 # Engineer/Executor retry loop.
 MAX_RETRY_ATTEMPTS = int(os.getenv("MAX_RETRY_ATTEMPTS", "5"))

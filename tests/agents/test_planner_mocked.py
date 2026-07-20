@@ -37,6 +37,8 @@ def _sample_context() -> PlannerInputContext:
         ),
         runtime_constraints={"hardware": "cpu_only"},
         repo_context={"repo_url": "https://example.com/repo"},
+        repo_setup_guide="pip install -r requirements.txt",
+        hyperparameter_reference="Table 1: batch_size=16",
     )
 
 
@@ -46,6 +48,8 @@ def test_planner_build_plan_with_mocked_ollama_call(monkeypatch) -> None:
 
     def fake_call(ctx: PlannerInputContext) -> ExecutionPlan:
         assert ctx.paper.paper_id == "paper_1"
+        assert ctx.repo_setup_guide == "pip install -r requirements.txt"
+        assert ctx.hyperparameter_reference == "Table 1: batch_size=16"
         return ExecutionPlan(
             plan_summary="Run baseline then BO variants.",
             domain="optimization",

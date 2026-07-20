@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from src.bundle import PaperBundle
 from src.persistence import _format_bundle_as_text, persist_extraction_bundle
 from src.state import (
     ExtractionBundle,
@@ -112,6 +113,8 @@ def test_persist_extraction_bundle_writes_json_file(tmp_path: Path, monkeypatch)
 
 
 def test_persist_extraction_bundle_writes_txt_file(tmp_path: Path, monkeypatch) -> None:
+    # Mock bundle directory
+    monkeypatch.setattr("src.bundle.PAPER_BUNDLES_DIR", tmp_path)
     monkeypatch.setattr("src.persistence.EXTRACTIONS_DIR", tmp_path)
     paper = _make_paper()
     bundle = _make_bundle()
@@ -119,7 +122,9 @@ def test_persist_extraction_bundle_writes_txt_file(tmp_path: Path, monkeypatch) 
 
     persist_extraction_bundle(paper, bundle, review)
 
-    txt_path = tmp_path / f"{paper.paper_id}_sections.txt"
+    # Check bundle structure
+    bundle_dir = tmp_path / paper.paper_id
+    txt_path = bundle_dir / "extraction_sections.txt"
     assert txt_path.exists()
     assert "Section: Abstract" in txt_path.read_text(encoding="utf-8")
 
@@ -152,3 +157,160 @@ def test_persist_extraction_bundle_review_status_saved(tmp_path: Path, monkeypat
 
     assert payload["review"]["status"] == "approved"
     assert payload["review"]["notes"] == "looks good"
+
+
+# ---------------------------------------------------------------------------
+# PaperBundle management tests
+# ---------------------------------------------------------------------------
+
+
+def test_paper_bundle_creation(tmp_path, monkeypatch):
+    """Test basic bundle creation and directory structure."""
+    monkeypatch.setattr("src.bundle.PAPER_BUNDLES_DIR", tmp_path)
+    
+    bundle = PaperBundle("test_paper")
+    assert not bundle.exists()
+    
+    bundle.create_bundle_dir()
+    assert bundle.exists()
+    assert bundle.bundle_dir.exists()
+    assert bundle.runs_dir.exists()
+
+
+def test_paper_bundle_extraction_persistence(tmp_path, monkeypatch):
+    """Test extraction save/load in bundle format."""
+    monkeypatch.setattr("src.bundle.PAPER_BUNDLES_DIR", tmp_path)
+    
+    bundle = PaperBundle("test_paper")
+    bundle.create_bundle_dir()
+    
+    # Create test data
+    paper = PaperMetadata(paper_id="test_paper", title="Test Paper", pdf_path="test.pdf")
+    extraction = SectionExtraction(
+        research_question="Test question",
+        methodology="Test methodology",
+        datasets_or_benchmarks=["Dataset1"],
+        evaluation_metrics=["accuracy"],
+    )
+    extraction_bundle = ExtractionBundle(by_section={}, merged=extraction)
+    review = ReviewRecord(status="approved", notes="Test review")
+    
+    # Save extraction
+    bundle.save_extraction(extraction_bundle, review, paper)
+    assert bundle.extraction_path.exists()
+    
+    # Load extraction
+    loaded_bundle = bundle.get_extraction()
+    assert loaded_bundle is not None
+    assert loaded_bundle.merged.research_question == "Test question"
+    assert loaded_bundle.merged.methodology == "Test methodology"
+
+
+def test_paper_bundle_no_code_scenario(tmp_path, monkeypatch):
+    """Test bundle behavior when no code repository is available."""
+    monkeypatch.setattr("src.bundle.PAPER_BUNDLES_DIR", tmp_path)
+    
+    bundle = PaperBundle("test_paper")
+    bundle.create_bundle_dir()
+    
+    # Test no code detection
+    assert not bundle.has_code()
+    
+    # Test repo info for no code
+    repo_info = bundle.get_repo_info()
+    assert repo_info.language == "unknown"
+    assert "No code repository available" in repo_info.notes
+    
+    # Test setup guide for no code
+    setup_guide = bundle.get_setup_guide()
+    assert setup_guide == ""
+
+
+def test_paper_bundle_with_code(tmp_path, monkeypatch):
+    """Test bundle behavior when code repository is available."""
+    monkeypatch.setattr("src.bundle.PAPER_BUNDLES_DIR", tmp_path)
+    
+    bundle = PaperBundle("test_paper")
+    bundle.create_bundle_dir()
+    
+    # Create mock code directory with files
+    bundle.code_dir.mkdir()
+    (bundle.code_dir / "main.py").write_text("print('hello')")
+    (bundle.code_dir / "requirements.txt").write_text("numpy==1.21.0")
+    
+    # Create README with setup instructions
+    readme_content = """# Test Project
+
+## Installation
+
+Run the following commands:
+
+```bash
+pip install -r requirements.txt
+python main.py
+```
+
+## Usage
+
+This is a test project.
+"""
+    (bundle.code_dir / "README.md").write_text(readme_content)
+    
+    # Test code detection
+    assert bundle.has_code()
+    
+    # Test setup guide extraction
+    setup_guide = bundle.get_setup_guide()
+    assert "Installation" in setup_guide
+    assert "pip install -r requirements.txt" in setup_guide
+
+
+def test_paper_bundle_hyperparameter_reference(tmp_path, monkeypatch):
+    """Test hyperparameter reference extraction from extraction."""
+    monkeypatch.setattr("src.bundle.PAPER_BUNDLES_DIR", tmp_path)
+    
+    bundle = PaperBundle("test_paper")
+    bundle.create_bundle_dir()
+    
+    # Create extraction with hyperparameters
+    paper = PaperMetadata(paper_id="test_paper", title="Test Paper", pdf_path="test.pdf")
+    extraction = SectionExtraction(
+        research_question="Test question",
+        hyperparameters={"lr": "0.001", "batch_size": "32", "epochs": "100"}
+    )
+    extraction_bundle = ExtractionBundle(by_section={}, merged=extraction)
+    review = ReviewRecord(status="approved")
+    
+    bundle.save_extraction(extraction_bundle, review, paper)
+    
+    # Test hyperparameter reference
+    ref = bundle.get_hyperparameter_reference()
+    assert "lr: 0.001" in ref
+    assert "batch_size: 32" in ref
+    assert "epochs: 100" in ref
+
+
+def test_paper_bundle_metadata(tmp_path, monkeypatch):
+    """Test metadata save/load functionality."""
+    monkeypatch.setattr("src.bundle.PAPER_BUNDLES_DIR", tmp_path)
+    
+    bundle = PaperBundle("test_paper")
+    
+    # Test no metadata initially
+    assert bundle.get_metadata() is None
+    
+    # Save metadata
+    metadata = {
+        "paper_id": "test_paper",
+        "title": "Test Paper",
+        "arxiv_id": "1234.5678",
+        "repo_url": "https://github.com/test/repo"
+    }
+    bundle.save_metadata(metadata)
+    assert bundle.metadata_path.exists()
+    
+    # Load metadata
+    loaded = bundle.get_metadata()
+    assert loaded is not None
+    assert loaded["paper_id"] == "test_paper"
+    assert loaded["title"] == "Test Paper"

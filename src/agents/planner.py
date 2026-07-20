@@ -12,7 +12,7 @@ from urllib import error, request
 from pydantic import ValidationError
 
 from src.agents.prompts.planner_prompt import build_planner_system_prompt
-from src.config import MODEL_NUM_PREDICT, MODEL_TEMPERATURE, OLLAMA_HOST, PLANNER_MODEL
+from src.config import MODEL_NUM_PREDICT, MODEL_TEMPERATURE, OLLAMA_HOST, PLANNER_MODEL, PLANNER_MAX_RETRIES
 from src.state import (
     AgentEnvelope,
     ExecutionPlan,
@@ -149,9 +149,9 @@ def _convert_envelope_to_legacy_plan(envelope: AgentEnvelope[PlannerPayload]) ->
 @dataclass
 class PaperPlanner:
     model: str = PLANNER_MODEL
-    max_parse_retries: int = 1
+    max_parse_retries: int = PLANNER_MAX_RETRIES
 
-    def _call_ollama_json(self, context: PlannerInputContext) -> ExecutionPlan:
+    def _call_ollama_json(self, context: PlannerInputContext) -> AgentEnvelope[PlannerPayload] | ExecutionPlan:
         extraction = context.approved_extraction
         system_prompt = build_planner_system_prompt(
             domain_vocabulary_block=(
@@ -176,20 +176,87 @@ class PaperPlanner:
             "evaluation_metrics": extraction.evaluation_metrics
             or ["unknown: no evaluation metrics identified"],
         }
+        
+        # #region DEBUG: Log analyst output (H1, H3)
+        logger.info("PLANNER_ANALYST_STRUCTURED: rq_empty=%s, methodology_empty=%s, datasets_count=%d, vars_count=%d, hyper_count=%d, metrics_count=%d",
+                    analyst_structured["research_question"].startswith("unknown"),
+                    analyst_structured["methodology"].startswith("unknown"),
+                    len(analyst_structured["datasets"]),
+                    len(analyst_structured["variables"]),
+                    len(analyst_structured["hyperparameters"]),
+                    len(analyst_structured["evaluation_metrics"]))
+        # #endregion
+        
+        # Build section-by-section context if available
+        sections_structured = {}
+        if context.extraction_sections:
+            for section_name, section_extraction in context.extraction_sections.items():
+                sections_structured[section_name] = {
+                    "research_question": section_extraction.research_question,
+                    "methodology": section_extraction.methodology,
+                    "datasets": section_extraction.datasets_or_benchmarks,
+                    "variables": section_extraction.variables,
+                    "hyperparameters": {k: v for k, v in section_extraction.hyperparameters.items()},
+                    "evaluation_metrics": section_extraction.evaluation_metrics,
+                }
+        
+        # #region DEBUG: Log sections structure (H2)
+        logger.info("PLANNER_SECTIONS_DEBUG: extraction_sections provided=%s, sections_structured keys=%s, total_vars=%d, total_hyper=%d",
+                    bool(context.extraction_sections),
+                    list(sections_structured.keys()) if sections_structured else "empty",
+                    sum(len(s.get("variables", [])) for s in sections_structured.values()),
+                    sum(len(s.get("hyperparameters", {})) for s in sections_structured.values()))
+        # #endregion
+        
         payload = {
             "paper": context.paper.model_dump(),
             "analyst_output": analyst_structured,
+            "extraction_sections": sections_structured,
             "runtime_constraints": context.runtime_constraints,
             "repo_context": context.repo_context,
+            "repo_setup_guide": context.repo_setup_guide,
+            "hyperparameter_reference": context.hyperparameter_reference,
         }
-        prompt = f"""
-Create a structured execution plan from the approved extraction context.
-Prioritize reproducibility and deterministic validation steps.
-Keep each action concrete and implementation-oriented.
+       # After building payload dict, before creating prompt:
+        extraction_sections_instruction = ""
+        if context.extraction_sections:
+            extraction_sections_instruction = """
+        IMPORTANT: You received extraction_sections (section-by-section extraction).
+        Use this to infer experiment structure:
+        - Group variables and metrics by section into natural experiments
+        - Each section often represents one experimental parameter sweep
+        - Populate experiment_matrix with one entry per distinct experiment
+        """
 
-Context JSON:
-{json.dumps(payload, indent=2)}
-""".strip()
+        # #region DEBUG: Log system prompt (H4)
+        try:
+            system_prompt = build_planner_system_prompt(domain_vocabulary_block="")
+            logger.info("PLANNER_SYSTEM_PROMPT_CHECK: length=%d, has_extraction_sections_mention=%s",
+                        len(system_prompt),
+                        "extraction_sections" in system_prompt)
+        except Exception as e:
+            logger.error("PLANNER_SYSTEM_PROMPT_ERROR: %s", str(e))
+        # #endregion
+        
+        prompt = f"""
+        Create a structured execution plan from the approved extraction context.
+        {extraction_sections_instruction}
+        Prioritize reproducibility and deterministic validation steps.
+        Keep each action concrete and implementation-oriented.
+
+        Context JSON:
+        {json.dumps(payload, indent=2)}
+        """.strip()
+        
+        # #region DEBUG: Log payload structure (H3)
+        logger.info("PLANNER_PAYLOAD_JSON: analyst_output keys=%s, extraction_sections keys=%s, repo_context present=%s",
+                    list(payload.get("analyst_output", {}).keys()),
+                    list(payload.get("extraction_sections", {}).keys()),
+                    bool(payload.get("repo_context")))
+        logger.info("PLANNER_PROMPT_LENGTH: %d chars, extraction_sections_instruction=%s",
+                    len(prompt),
+                    "PRESENT" if extraction_sections_instruction else "MISSING")
+        # #endregion
 
         last_error: Exception | None = None
         raw_response: str = ""
@@ -222,10 +289,32 @@ Context JSON:
                 with request.urlopen(req, timeout=180) as response:
                     body = json.loads(response.read().decode("utf-8"))
                 raw_response = str(body.get("message", {}).get("content", ""))
+                
+                # #region DEBUG: Log raw response (H5)
+                logger.info("PLANNER_OLLAMA_RESPONSE: length=%d, is_empty=%s, first_100_chars=%s",
+                            len(raw_response),
+                            raw_response.strip() == "",
+                            raw_response[:100] if raw_response else "NONE")
+                # #endregion
+                
                 logger.info("Planner raw response: %s", raw_response)
                 if not raw_response.strip():
                     raise json.JSONDecodeError("Empty model response", "", 0)
                 parsed = json.loads(_clean_json_response(raw_response))
+                
+                # #region DEBUG: Log parsed JSON (H5)
+                logger.info("PLANNER_PARSED_JSON: top_level_keys=%s, has_execution_plan=%s",
+                            list(parsed.keys()),
+                            "execution_plan" in parsed)
+                if "execution_plan" in parsed:
+                    ep = parsed["execution_plan"]
+                    logger.info("PLANNER_EXECUTION_PLAN_CONTENT: plan_summary_empty=%s, domain_empty=%s, objective_empty=%s, steps_count=%d, exp_matrix_count=%d",
+                                ep.get("plan_summary", "") == "",
+                                ep.get("domain", "") == "",
+                                ep.get("objective", "") == "",
+                                len(ep.get("steps", [])),
+                                len(ep.get("experiment_matrix", [])))
+                # #endregion
                 
                 # Try parsing as new envelope format first
                 if "schema_version" in parsed and parsed.get("schema_version") == "2.0":
@@ -242,8 +331,7 @@ Context JSON:
                         logger.warning("Planner warnings: %s", envelope.warnings)
                     
                     # Core fields are validated by Pydantic; extensions are optional
-                    # Convert to legacy format for backward compatibility
-                    return _convert_envelope_to_legacy_plan(envelope)
+                    return envelope
                 else:
                     # Fall back to legacy format
                     logger.info("Parsing as legacy plan format")
@@ -264,5 +352,5 @@ Context JSON:
             f"last_error={last_error}. raw_response={raw_response!r}"
         )
 
-    def build_plan(self, context: PlannerInputContext) -> ExecutionPlan:
+    def build_plan(self, context: PlannerInputContext) -> AgentEnvelope[PlannerPayload] | ExecutionPlan:
         return self._call_ollama_json(context)

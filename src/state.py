@@ -33,7 +33,7 @@ class AgentEnvelope(BaseModel, Generic[PayloadT]):
     """Shared top-level contract for all LLM-backed agents."""
     schema_version: str = "2.0"
     agent: Literal["analyst", "planner", "engineer", "reviewer"]
-    status: Literal["ok", "partial", "blocked"] = "ok"
+    status: Literal["ok", "partial", "blocked", "ready_to_execute"] = "ok"
     unknowns: list[UnknownItem] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     payload: PayloadT
@@ -121,8 +121,13 @@ class ReviewRecord(BaseModel):
 class PlannerInputContext(BaseModel):
     paper: PaperMetadata
     approved_extraction: SectionExtraction
+    extraction_sections: dict[str, SectionExtraction] | None = None
     runtime_constraints: dict[str, str] = Field(default_factory=dict)
     repo_context: dict[str, str] = Field(default_factory=dict)
+    repo_setup_guide: str = ""
+    hyperparameter_reference: str = ""
+    extraction_file_path: str | None = None
+    paper_bundle_path: str | None = None
 
 
 class PlanStepCore(BaseModel):
@@ -192,8 +197,12 @@ class ExperimentSpec(BaseModel):
     name: str
     target: str = ""
     variables: list[str] = Field(default_factory=list)
-    hyperparameters: dict[str, str] = Field(default_factory=dict)
+    hyperparameters: dict[str, str | int | float | bool] = Field(default_factory=dict)
     metrics: list[str] = Field(default_factory=list)
+    source_section: str = ""
+    implementation_steps: list[str] = Field(default_factory=list)
+    execution_pattern: str = ""
+    expected_runtime_minutes: int | None = None
 
 
 class ExecutionPlan(BaseModel):
@@ -240,8 +249,8 @@ class FailureContext(BaseModel):
 
 class EngineerInputContext(BaseModel):
     paper: PaperMetadata
-    execution_plan: ExecutionPlan
-    plan_step: PlanStep
+    execution_plan: ExecutionPlan | AgentEnvelope[PlannerPayload]
+    plan_step: PlanStep | PlanStepCore
     repo_context: RepoContext
     runtime_constraints: dict[str, str] = Field(default_factory=dict)
     failure_context: FailureContext | None = None
@@ -381,7 +390,7 @@ class ResearchState(TypedDict, total=False):
     extraction: ExtractionBundle
     review: ReviewRecord
     approved_extraction: SectionExtraction
-    planner_output: ExecutionPlan
+    planner_output: ExecutionPlan | AgentEnvelope[PlannerPayload]
     planner_output_json: dict[str, Any]
     plan_review: PlanReviewRecord
     repo_context: RepoContext

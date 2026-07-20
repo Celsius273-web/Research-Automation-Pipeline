@@ -4,9 +4,20 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import re
 from collections.abc import Callable
 from pathlib import Path
+
+# #region DEBUG: Setup console logging for visibility
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    handlers=[
+        logging.StreamHandler(),  # Print to console
+    ]
+)
+# #endregion
 
 from src.config import EXTRACTIONS_DIR, MAX_RETRY_ATTEMPTS
 from src.db import DatabaseError, get_paper_by_id
@@ -164,7 +175,13 @@ def run_plan(extraction_path: str | None, paper_id: str | None, non_interactive:
 
     payload = json.loads(source_path.read_text(encoding="utf-8"))
     paper = PaperMetadata.model_validate(payload.get("paper", {}))
-    approved_extraction = SectionExtraction.model_validate(payload.get("approved_extraction", {}))
+    
+    # Load extraction - handle both bundle format (merged) and legacy format (approved_extraction)
+    if "merged" in payload:
+        approved_extraction = SectionExtraction.model_validate(payload.get("merged", {}))
+    else:
+        approved_extraction = SectionExtraction.model_validate(payload.get("approved_extraction", {}))
+    
     review = ReviewRecord.model_validate(payload.get("review", {}))
     if review.status != "approved":
         print("Extraction review is not approved. Planner cannot run.")
@@ -351,9 +368,60 @@ def run_review(run_path: str | None, paper_id: str | None, extraction_path: str 
     return 0
 
 
+def run_full_pipeline(paper_id: str, non_interactive: bool) -> int:
+    """Run the complete pipeline: analyze -> plan -> execute -> review."""
+    print(f"Starting full pipeline for paper: {paper_id}")
+    
+    # Phase 1: Analyze
+    print("=== Phase 1: Analysis ===")
+    exit_code = run_analyze(paper_id=paper_id, non_interactive=non_interactive, with_plan=False)
+    if exit_code != 0:
+        print("Analysis phase failed, stopping pipeline.")
+        return exit_code
+    
+    # Phase 2: Plan
+    print("\n=== Phase 2: Planning ===")
+    exit_code = run_plan(extraction_path=None, paper_id=paper_id, non_interactive=non_interactive)
+    if exit_code != 0:
+        print("Planning phase failed, stopping pipeline.")
+        return exit_code
+    
+    # Phase 3: Execute
+    print("\n=== Phase 3: Execution ===")
+    exit_code = run_execute(
+        plan_path=None,
+        paper_id=paper_id,
+        repo_path=None,
+        non_interactive=non_interactive,
+        with_review=False
+    )
+    if exit_code != 0:
+        print("Execution phase failed, stopping pipeline.")
+        return exit_code
+    
+    # Phase 4: Review
+    print("\n=== Phase 4: Review ===")
+    exit_code = run_review(run_path=None, paper_id=paper_id, extraction_path=None)
+    if exit_code != 0:
+        print("Review phase failed.")
+        return exit_code
+    
+    print(f"\n=== Pipeline Complete for {paper_id} ===")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Autonomous Research Assistant CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
+    
+    # Full pipeline command
+    run_parser = subparsers.add_parser("run", help="Run complete pipeline: analyze -> plan -> execute -> review")
+    run_parser.add_argument("paper_id", help="Paper ID of an ingested paper")
+    run_parser.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help="Auto-approve all phases without CLI prompts.",
+    )
     analyze = subparsers.add_parser("analyze", help="Run Phase 1 analyst flow for an ingested paper")
     analyze.add_argument("paper_id", help="Paper ID of an ingested paper")
     analyze.add_argument(
@@ -399,6 +467,11 @@ def main() -> int:
     parser = build_parser()
     try:
         args = parser.parse_args()
+        if args.command == "run":
+            return run_full_pipeline(
+                paper_id=args.paper_id,
+                non_interactive=args.non_interactive,
+            )
         if args.command == "analyze":
             return run_analyze(
                 paper_id=args.paper_id,
