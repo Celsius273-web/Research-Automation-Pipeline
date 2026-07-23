@@ -163,7 +163,7 @@ def ingest_paper(
         if paper_exists(paper_id):
             raise ValueError(f"Paper ID '{paper_id}' already exists in database")
     
-    # Create bundle directory
+    # Create bundle directory (use paper_id for path consistency, not title)
     bundle_dir = PAPER_BUNDLES_DIR / paper_id
     if bundle_dir.exists():
         raise ValueError(f"Bundle directory already exists: {bundle_dir}")
@@ -192,7 +192,7 @@ def ingest_paper(
         # Create ingested paper record
         record = IngestedPaperRecord(
             paper_id=paper_id,
-            title=title or source_pdf.stem,
+            title=title if title is not None else source_pdf.stem,
             arxiv_id=arxiv_id,
             repo_url=repo_url,
             bundle_path=str(bundle_dir),

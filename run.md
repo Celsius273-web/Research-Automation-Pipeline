@@ -4,132 +4,86 @@
 
 **Database setup (SQLite, run once):**
 ```bash
-.venv/bin/python scripts/ingest_paper.py --init-db
+source /Users/school/ResearchAssistant/.venv/bin/activate 
+
+.venv/bin/python -c "
+from src.db import init_schema
+init_schema()
+print('Database initialized')
+"
 ```
-
-**Ollama must be running with the analyst model loaded:**
-```bash
-ollama serve          # in a separate terminal if not already running
-ollama pull qwen3.5:9b
-```
-
----
-
-## Paper Bundle Organization
-
-All artifacts for a paper are colocated in a single directory under `data/papers/{paper_id}/`:
-
-```
-data/papers/p2p_replication/
-├── paper.pdf                         # Original PDF
-├── metadata.json                     # Ingestion metadata
-├── code/                             # Cloned repository (if provided during ingestion)
-├── p2p_replication.json              # Extraction JSON (authoritative)
-├── p2p_replication_sections.txt      # Human-readable extraction
-├── p2p_replication_plan.json         # Execution plan (created by Planner)
-├── report.json                       # Final review report
-└── runs/                             # Execution attempts
-```
-
-This organization makes it easy for all agents to find related artifacts without searching across multiple directories.
-
----
+clear data base
+psql postgresql://localhost/research_assistant -c "DELETE FROM papers;"
 
 ## Step 1 — Ingest a paper
 
-Copy a PDF into the project and register it. All files are automatically stored in `data/papers/{paper_id}/`:
-
+Copy a PDF into the project and register it. All files are automatically stored in `data/papers/{paper_id}/`: 
+(I have stated paper id such that its easy to track what papers are what not a number combo.)
 ```bash
 # PDF only
-.venv/bin/python scripts/ingest_paper.py --pdf-path "/path/to/paper.pdf"
-
-# PDF + GitHub repository (clones code alongside the PDF)
-.venv/bin/python scripts/ingest_paper.py \
-  --pdf-path "/path/to/paper.pdf" \
-  --repo-url "https://github.com/author/repo" \
-  --title "Short descriptive title"
+.venv/bin/python scripts/ingest_paper.py --pdf-path "/path/to/paper.pdf" --repo-url "https://github.com/staglibrary/stag" --title "STAG" --paper-id "STAG"
 ```
+cd /Users/school/ResearchAssistant
 
-**Output:** `data/papers/<paper_id>/paper.pdf`, `metadata.json`, optional `code/`.
+.venv/bin/python scripts/ingest_paper.py --pdf-path "/Users/school/Pre-trained_Gaussian_Processes_Bayesian_Optimization.pdf" --title "Pretrained Gaussian Processes Bayesian Optimization" --paper-id "pretrained_gp_bo" --repo-url "https://github.com/google-research/hyperbo/"
 
+.venv/bin/python scripts/ingest_paper.py --pdf-path "/Users/school/2304.03170v1.pdf" --title "Sparse Topology Aware Graph Neural Networks" --paper-id "stag_sparse" --repo-url "https://github.com/staglibrary/stag"
+
+.venv/bin/python scripts/ingest_paper.py --pdf-path "/Users/school/2402.07692v2.pdf" --title "Boundary Exploration Bayesian Optimization" --paper-id "boundary_exploration_bo" --repo-url "https://github.com/yunshengtian/BE-CBO"
+
+.venv/bin/python scripts/ingest_paper.py --pdf-path "/Users/school/1907.00481v6.pdf" --title "Spectral Clustering Graph Neural Networks" --paper-id "spectral_clustering_gnn" --repo-url "https://github.com/FilippoMB/Spectral-Clustering-with-Graph-Neural-Networks-for-Graph-Pooling"
 ---
 
-## Step 2 — Run the Analyst (standalone extraction)
+## Step 2 — Run Analyst (extraction)
 
-Extracts `research_question`, `methodology`, `datasets`, `variables`, `hyperparameters`,
-and `evaluation_metrics` from every section of the paper. Writes extraction to the bundle:
+.venv/bin/python -m src.main analyst --paper-id pretrained_gp_bo --non-interactive
+.venv/bin/python -m src.main analyst --paper-id stag_sparse --non-interactive
+.venv/bin/python -m src.main analyst --paper-id boundary_exploration_bo --non-interactive
+.venv/bin/python -m src.main analyst --paper-id spectral_clustering_gnn --non-interactive
 
 ```bash
-.venv/bin/python -c "
-from src.tools.pdf_parser import parse_pdf_sections
-from src.agents.analyst import PaperAnalyst
-from src.persistence import persist_extraction_bundle
-from src.state import PaperMetadata, ReviewRecord
+# Analyst only (interactive with review checkpoint)
+.venv/bin/python -m src.main analyst --paper-id <paper_id>
 
-paper_id = 'YOUR_PAPER_ID'   # folder name under data/papers/
+# Analyst only (auto-approve, no review checkpoint)
+.venv/bin/python -m src.main analyst --paper-id <paper_id> --non-interactive
 
-sections = parse_pdf_sections(f'data/papers/{paper_id}/paper.pdf')
-analyst  = PaperAnalyst()
-bundle   = analyst.extract(sections)
+# Analyst + Planner together (interactive with review checkpoints)
+.venv/bin/python -m src.main analyst --paper-id <paper_id> --with-plan
 
-paper  = PaperMetadata(
-    paper_id = paper_id,
-    title    = 'Your Paper Title',
-    pdf_path = f'data/papers/{paper_id}/paper.pdf',
-)
-review   = ReviewRecord(status='approved')
-json_path = persist_extraction_bundle(paper, bundle, review)
-txt_path  = json_path.parent / (json_path.stem + '_sections.txt')
-
-print(txt_path.read_text(encoding='utf-8'))
-print('Saved:', json_path)
-"
+# Analyst + Planner together (auto-approve all checkpoints)
+.venv/bin/python -m src.main analyst --paper-id <paper_id> --with-plan --non-interactive
 ```
-
+"
 **Output files in `data/papers/<paper_id>/`:**
 
 | File | Contents |
 |---|---|
 | `{paper_id}.json` | Machine-readable JSON with `by_section` + `merged` extraction |
 | `{paper_id}_sections.txt` | Human-readable per-section breakdown |
-
+"
 ---
 
-## Step 3 — Run the Planner
+## Step 3 — Run Planner (execution plan)
 
-Requires an **approved** extraction artifact. Produces a step-by-step execution plan the Engineer can follow.
+Requires an **approved extraction artifact** (run Analyst first).
 
 ```bash
-# From an existing extraction (by paper id)
+# Planner only (interactive with review checkpoint)
 .venv/bin/python -m src.main plan --paper-id <paper_id>
 
-# Skip the plan review checkpoint
+# Planner only (auto-approve)
 .venv/bin/python -m src.main plan --paper-id <paper_id> --non-interactive
+
+# Planner from explicit extraction path
+.venv/bin/python -m src.main plan --extraction-path /path/to/extraction.json --non-interactive
 ```
 
 **Output:** `data/papers/<paper_id>/{paper_id}_plan.json`
 
-The planner receives:
-- Full extraction context (research question, methodology, datasets, hyperparameters, etc.)
-- Bundle paths so it understands where artifacts are located
-- Repository setup guide (if code was provided)
-- Hyperparameter reference extracted from the paper
-
 ---
 
-## Step 4 — Full pipeline (analyze + plan)
-
-Runs Analyst then Planner in one go, with human review checkpoints:
-
-```bash
-.venv/bin/python -m src.main analyze <paper_id> --with-plan
-```
-
-Skip the review prompts with `--non-interactive`.
-
----
-
-## Step 5 — Execute & review (Phase 3+)
+## Step 4 — Execute & review (Phase 3+)
 
 ```bash
 # Execute plan + run reviewer

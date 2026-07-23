@@ -16,11 +16,7 @@ if str(ROOT_DIR) not in sys.path:
 from src.config import ANALYST_MODEL, OLLAMA_HOST, REASONING_FALLBACK_MODEL
 
 DEFAULT_TEXT = """
-We evaluate Bayesian optimization on standard synthetic benchmark functions.
-Our method improves sample efficiency by combining surrogate uncertainty with
-trust-region adaptation. We compare against EI, UCB, and random search.
-Hyperparameters include initial_design=10, max_iterations=200, and batch_size=4.
-Metrics: simple regret and best-found objective across 30 seeds.
+Evaluate the quality of the following text:
 """.strip()
 
 PROMPT = """

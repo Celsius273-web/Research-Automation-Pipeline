@@ -11,6 +11,7 @@ def build_planner_system_prompt(domain_vocabulary_block: str = "") -> str:
 {SHARED_PROMPT_PREFIX}
 
 Role: Planner
+You receive ONE required input: analyst_output, a JSON object with these exact fields: research_question, methodology, datasets_or_benchmarks, variables, hyperparameters, evaluation_metrics, reported_results, notes. Parse it first. Every field is present. Use them directly
 - Input comes directly from Paper Analyst fields:
   research_question, methodology, datasets, variables, hyperparameters, evaluation_metrics.
 - Additional optional context you may receive:

@@ -92,6 +92,77 @@ def _has_real_plan(plan: ExecutionPlan) -> bool:
     return bool(plan.model_dump(exclude_defaults=True, exclude_none=True))
 
 
+def run_analyst(paper_id: str, non_interactive: bool, with_plan: bool) -> int:
+    """Run analyst only (extraction), optionally followed by planner."""
+    try:
+        ingested_paper = get_paper_by_id(paper_id)
+    except DatabaseError as e:
+        print(f"Database error: {e}")
+        return 1
+    
+    if ingested_paper is None:
+        print(f"Paper '{paper_id}' not found. Please ingest the paper first using:")
+        print(f"  python scripts/ingest_paper.py --pdf-path <pdf_path> --paper-id {paper_id}")
+        return 1
+    
+    pdf_path = Path(ingested_paper.pdf_path)
+    if not pdf_path.exists():
+        print(f"Ingested PDF file missing: {pdf_path}")
+        return 1
+    
+    paper = PaperMetadata(
+        paper_id=ingested_paper.paper_id,
+        title=ingested_paper.title,
+        pdf_path=ingested_paper.pdf_path,
+        arxiv_id=ingested_paper.arxiv_id,
+    )
+    state = make_initial_state(paper)
+
+    parse_node, analyst_node, review_node = make_phase1_nodes(non_interactive=non_interactive)
+    if with_plan:
+        planner_node = make_planner_node(non_interactive=non_interactive)
+        graph = build_phase2_graph(
+            parse_node=parse_node,
+            analyst_node=analyst_node,
+            review_node=review_node,
+            planner_node=planner_node,
+        )
+    else:
+        graph = build_phase1_graph(parse_node=parse_node, analyst_node=analyst_node, review_node=review_node)
+    try:
+        out = graph.invoke(state)
+    except ReviewCancelledError:
+        return _handle_review_cancelled()
+    error_code = _print_errors_and_fail(out.get("errors", []), "Analyze failed:")
+    if error_code:
+        return error_code
+
+    saved_extraction = persist_extraction(
+        paper=out["paper"],
+        extraction=out["approved_extraction"],
+        review=out["review"],
+    )
+    print(f"Saved extraction: {saved_extraction}")
+    print(f"Review status: {out['review'].status}")
+    plan_review = out.get("plan_review")
+    if (
+        with_plan
+        and out["review"].status == "approved"
+        and plan_review is not None
+        and plan_review.status == "approved"
+        and _has_real_plan(out["planner_output"])
+    ):
+        saved_plan = persist_plan(
+            paper=out["paper"],
+            plan=out["planner_output"],
+            plan_review=plan_review,
+            source_extraction_path=str(saved_extraction),
+        )
+        print(f"Saved plan: {saved_plan}")
+        print(f"Plan review status: {plan_review.status}")
+    return 0
+
+
 def run_analyze(paper_id: str, non_interactive: bool, with_plan: bool) -> int:
     try:
         ingested_paper = get_paper_by_id(paper_id)
@@ -434,6 +505,18 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Run Planner after approved extraction and persist plan output.",
     )
+    analyst = subparsers.add_parser("analyst", help="Run analyst only (extraction)")
+    analyst.add_argument("--paper-id", required=True, help="Paper ID of an ingested paper")
+    analyst.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help="Auto-approve extraction without CLI prompts.",
+    )
+    analyst.add_argument(
+        "--with-plan",
+        action="store_true",
+        help="Also run Planner after approved extraction.",
+    )
     plan = subparsers.add_parser("plan", help="Run Planner from an existing extraction artifact")
     plan.add_argument("--extraction-path", help="Path to extraction JSON artifact")
     plan.add_argument("--paper-id", help="Paper id to load from data/extractions/<paper_id>.json")
@@ -474,6 +557,12 @@ def main() -> int:
             )
         if args.command == "analyze":
             return run_analyze(
+                paper_id=args.paper_id,
+                non_interactive=args.non_interactive,
+                with_plan=args.with_plan,
+            )
+        if args.command == "analyst":
+            return run_analyst(
                 paper_id=args.paper_id,
                 non_interactive=args.non_interactive,
                 with_plan=args.with_plan,
