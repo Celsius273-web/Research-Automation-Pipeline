@@ -118,12 +118,65 @@ class ReviewRecord(BaseModel):
     notes: str = ""
 
 
+class PlannerAnalystOutput(BaseModel):
+    """Analyst fields accepted by the Planner's unified input contract."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    research_question: str
+    methodology: str
+    datasets_or_benchmarks: list[str]
+    variables: list[str]
+    hyperparameters: dict[str, Any]
+    evaluation_metrics: list[str]
+    reported_results: list["ReportedResult"]
+    notes: str
+
+
+class PlannerRepoContext(BaseModel):
+    """Repository facts exposed to the Planner LLM."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    url: str
+    language: str
+    build_system: str
+    has_code: bool
+    setup_time_minutes: float
+    file_tree: str
+    readme_summary: str
+    example_commands: list[str] = Field(default_factory=list)
+
+
+class PlannerFlags(BaseModel):
+    """Derived routing facts for the Planner."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    has_research_question: bool
+    has_methodology: bool
+    has_code_repo: bool
+    has_datasets: bool
+    paper_type: Literal["methods", "empirical", "toolkit"]
+
+
+class UnifiedPlannerInput(BaseModel):
+    """Fixed four-key Planner input contract."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    analyst_output: PlannerAnalystOutput
+    repo_context: PlannerRepoContext
+    paper_context: PaperMetadata
+    flags: PlannerFlags
+
+
 class PlannerInputContext(BaseModel):
     paper: PaperMetadata
     approved_extraction: SectionExtraction
     extraction_sections: dict[str, SectionExtraction] | None = None
     runtime_constraints: dict[str, str] = Field(default_factory=dict)
-    repo_context: dict[str, str] = Field(default_factory=dict)
+    repo_context: dict[str, Any] = Field(default_factory=dict)
     repo_setup_guide: str = ""
     hyperparameter_reference: str = ""
     extraction_file_path: str | None = None
@@ -230,6 +283,11 @@ class RepoContext(BaseModel):
     repo_path: str = ""
     language: str = "unknown"
     build_system: str = "unknown"
+    has_code: bool = False
+    setup_time_minutes: float = 0
+    file_tree: str = ""
+    readme_summary: str = ""
+    example_commands: list[str] = Field(default_factory=list)
     notes: str = ""
 
 

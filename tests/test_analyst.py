@@ -272,8 +272,8 @@ def test_extract_merged_result_contains_nonempty_core_fields() -> None:
     assert bundle.merged.hyperparameters
 
 
-def test_extract_passes_full_text_to_empty_sections() -> None:
-    """Empty named sections should receive full_text, not an empty string."""
+def test_extract_skips_empty_named_sections_without_full_text_fallback() -> None:
+    """Empty named sections stay empty; only abstract may use full_text if all are empty."""
     received: dict[str, str] = {}
 
     def tracking_call(section: str, text: str) -> SectionExtraction:
@@ -283,11 +283,26 @@ def test_extract_passes_full_text_to_empty_sections() -> None:
     analyst = PaperAnalyst()
     analyst._call_ollama_json = tracking_call
 
-    analyst.extract(SectionTextMap(abstract="Has content", full_text="FALLBACK"))
+    bundle = analyst.extract(SectionTextMap(abstract="Has content", full_text="FALLBACK"))
 
     assert received["abstract"] == "Has content"
-    for section in ("method", "experiments", "hyperparameters", "appendix"):
-        assert received[section] == "FALLBACK", f"section '{section}' should receive full_text"
+    assert "method" not in received
+    assert bundle.by_section["method"] == SectionExtraction()
+
+
+def test_extract_uses_full_text_only_when_all_named_sections_empty() -> None:
+    received: dict[str, str] = {}
+
+    def tracking_call(section: str, text: str) -> SectionExtraction:
+        received[section] = text
+        return SectionExtraction.model_validate(_flat_payload())
+
+    analyst = PaperAnalyst()
+    analyst._call_ollama_json = tracking_call
+
+    analyst.extract(SectionTextMap(full_text="FALLBACK ONLY"))
+
+    assert received == {"abstract": "FALLBACK ONLY"}
 
 
 def test_extract_raises_when_no_text_available_for_any_section() -> None:
@@ -295,6 +310,115 @@ def test_extract_raises_when_no_text_available_for_any_section() -> None:
     with pytest.raises(RuntimeError, match="No usable text"):
         analyst.extract(SectionTextMap())
 
+
+def test_soft_fill_toolkit_research_question() -> None:
+    from src.agents.analyst import soft_fill_research_question
+
+    filled = soft_fill_research_question(
+        SectionExtraction(
+            methodology="STAG is an open-source C++ and Python library for spectral graph algorithms.",
+        ),
+        paper_title="Sparse Topology Aware Graph Neural Networks",
+    )
+    assert filled.research_question.startswith("Toolkit paper:")
+    assert "[inferred]" in filled.notes
+
+
+def test_soft_fill_methodology_research_question() -> None:
+    from src.agents.analyst import soft_fill_research_question
+
+    filled = soft_fill_research_question(
+        SectionExtraction(methodology="Propose BE-CBO using neural constraint ensembles."),
+        paper_title="Boundary Exploration BO",
+    )
+    assert "BE-CBO" in filled.research_question
+    assert filled.research_question.startswith("How can we implement")
+    assert "[inferred] research_question synthesized from methodology" in filled.notes
+
+
+def test_finalize_drops_junk_datasets_and_empty_results() -> None:
+    from src.agents.analyst import finalize_merged_extraction
+
+    cleaned = finalize_merged_extraction(
+        SectionExtraction(
+            research_question="RQ",
+            methodology="Method",
+            datasets_or_benchmarks=[
+                "Townsend Function (2D)",
+                "synthetic",
+                "Eaton (2007) Lemma 8",
+            ],
+            reported_results=[
+                ReportedResult(benchmark="", metric_name="", value="STAG 1.2", source="abstract"),
+                ReportedResult(
+                    benchmark="Cora",
+                    metric_name="NMI",
+                    value="see Table 4",
+                    source="Table 4",
+                ),
+                ReportedResult(
+                    benchmark="Cora",
+                    metric_name="quality",
+                    value="successfully outperforms baselines",
+                    source="Figure 3",
+                ),
+                ReportedResult(
+                    benchmark="wiki-topcats",
+                    metric_name="running time",
+                    value="1.2s",
+                    source="Table 1",
+                ),
+            ],
+        )
+    )
+    assert cleaned.datasets_or_benchmarks == ["Townsend Function (2D)"]
+    assert len(cleaned.reported_results) == 1
+    assert cleaned.reported_results[0].metric_name == "running time"
+
+
+def test_chunk_section_text_covers_long_experiments() -> None:
+    from src.agents.analyst import chunk_section_text
+
+    text = ("A" * 10000) + "TABLE_MARKER" + ("B" * 15000)
+    chunks = chunk_section_text(text, chunk_size=12000, overlap=800, max_chunks=4)
+    assert len(chunks) >= 2
+    assert any("TABLE_MARKER" in chunk for chunk in chunks)
+    assert sum(len(chunk) for chunk in chunks) >= len(text)
+
+
+def test_extract_chunks_experiments_section(monkeypatch) -> None:
+    calls: list[str] = []
+
+    def fake_call(section: str, text: str) -> SectionExtraction:
+        calls.append(section)
+        value = "0.42" if "chunk 2" in section else "0.11"
+        return SectionExtraction(
+            reported_results=[
+                ReportedResult(
+                    benchmark="Cora",
+                    metric_name="NMI",
+                    value=value,
+                    source="Table 3",
+                )
+            ]
+        )
+
+    analyst = PaperAnalyst()
+    monkeypatch.setattr(analyst, "_call_ollama_json", fake_call)
+    monkeypatch.setattr(
+        "src.agents.analyst.chunk_section_text",
+        lambda text, **_kwargs: ["window-one", "window-two"],
+    )
+
+    bundle = analyst.extract(
+        SectionTextMap(experiments="long experiments text"),
+        paper_title="Demo",
+    )
+
+    assert any("chunk 1" in label for label in calls)
+    assert any("chunk 2" in label for label in calls)
+    values = {item.value for item in bundle.by_section["experiments"].reported_results}
+    assert values == {"0.11", "0.42"}
 
 # ---------------------------------------------------------------------------
 # _build_retry_reminder — targeted error feedback to the model

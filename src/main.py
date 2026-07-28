@@ -9,15 +9,15 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
-# #region DEBUG: Setup console logging for visibility
+from pydantic import ValidationError
+
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.WARNING,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-    handlers=[
-        logging.StreamHandler(),  # Print to console
-    ]
+    handlers=[logging.StreamHandler()],
 )
-# #endregion
+# Planner I/O goes to planner_debug.md; keep a single INFO line for that path.
+logging.getLogger("src.agents.planner").setLevel(logging.INFO)
 
 from src.config import EXTRACTIONS_DIR, MAX_RETRY_ATTEMPTS
 from src.db import DatabaseError, get_paper_by_id
@@ -29,7 +29,7 @@ from src.graphs.research_graph import (
 )
 from src.persistence import (
     load_reported_results,
-    persist_extraction,
+    persist_extraction_bundle,
     persist_plan,
     persist_report,
     persist_run_summary,
@@ -37,6 +37,7 @@ from src.persistence import (
     resolve_plan_path,
     resolve_run_summary_path,
 )
+from src.planner_input import load_unified_planner_input
 from src.review_prompts import ReviewCancelledError
 from src.pipeline_nodes import (
     default_runtime_constraints,
@@ -47,6 +48,7 @@ from src.pipeline_nodes import (
 )
 from src.state import (
     ExecutionPlan,
+    ExtractionBundle,
     ExecutorResult,
     PaperMetadata,
     RepoContext,
@@ -137,9 +139,9 @@ def run_analyst(paper_id: str, non_interactive: bool, with_plan: bool) -> int:
     if error_code:
         return error_code
 
-    saved_extraction = persist_extraction(
+    saved_extraction = persist_extraction_bundle(
         paper=out["paper"],
-        extraction=out["approved_extraction"],
+        bundle=out["extraction"],
         review=out["review"],
     )
     print(f"Saved extraction: {saved_extraction}")
@@ -208,9 +210,9 @@ def run_analyze(paper_id: str, non_interactive: bool, with_plan: bool) -> int:
     if error_code:
         return error_code
 
-    saved_extraction = persist_extraction(
+    saved_extraction = persist_extraction_bundle(
         paper=out["paper"],
-        extraction=out["approved_extraction"],
+        bundle=out["extraction"],
         review=out["review"],
     )
     print(f"Saved extraction: {saved_extraction}")
@@ -234,7 +236,48 @@ def run_analyze(paper_id: str, non_interactive: bool, with_plan: bool) -> int:
     return 0
 
 
-def run_plan(extraction_path: str | None, paper_id: str | None, non_interactive: bool) -> int:
+def run_plan(
+    extraction_path: str | None,
+    paper_id: str | None,
+    non_interactive: bool,
+    input_json: str | None = None,
+) -> int:
+    if input_json:
+        if extraction_path or paper_id:
+            print("--input-json cannot be combined with --extraction-path or --paper-id.")
+            return 1
+        source_path = Path(input_json).resolve()
+        if not source_path.exists():
+            print(f"Planner input file does not exist: {source_path}")
+            return 1
+        try:
+            unified_input = load_unified_planner_input(source_path)
+        except (json.JSONDecodeError, OSError, ValidationError) as exc:
+            print(f"Invalid unified Planner input: {exc}")
+            return 1
+
+        state = make_initial_state(unified_input.paper_context)
+        planner_node = make_planner_node(
+            non_interactive=non_interactive,
+            unified_input=unified_input,
+        )
+        try:
+            out = planner_node(state)
+        except ReviewCancelledError:
+            return _handle_review_cancelled()
+        error_code = _print_errors_and_fail(out["errors"], "Planner failed:")
+        if error_code:
+            return error_code
+        saved_plan = persist_plan(
+            paper=out["paper"],
+            plan=out["planner_output"],
+            plan_review=out["plan_review"],
+            source_extraction_path=str(source_path),
+        )
+        print(f"Saved plan: {saved_plan}")
+        print(f"Plan review status: {out['plan_review'].status}")
+        return 0
+
     try:
         source_path = resolve_extraction_path(extraction_path=extraction_path, paper_id=paper_id)
     except ValueError as exc:
@@ -250,8 +293,15 @@ def run_plan(extraction_path: str | None, paper_id: str | None, non_interactive:
     # Load extraction - handle both bundle format (merged) and legacy format (approved_extraction)
     if "merged" in payload:
         approved_extraction = SectionExtraction.model_validate(payload.get("merged", {}))
+        extraction = ExtractionBundle.model_validate(
+            {
+                "by_section": payload.get("by_section", {}),
+                "merged": payload.get("merged", {}),
+            }
+        )
     else:
         approved_extraction = SectionExtraction.model_validate(payload.get("approved_extraction", {}))
+        extraction = ExtractionBundle(by_section={}, merged=approved_extraction)
     
     review = ReviewRecord.model_validate(payload.get("review", {}))
     if review.status != "approved":
@@ -259,6 +309,7 @@ def run_plan(extraction_path: str | None, paper_id: str | None, non_interactive:
         return 1
 
     state = make_initial_state(paper)
+    state["extraction"] = extraction
     state["approved_extraction"] = approved_extraction
     state["review"] = review
 
@@ -520,6 +571,7 @@ def build_parser() -> argparse.ArgumentParser:
     plan = subparsers.add_parser("plan", help="Run Planner from an existing extraction artifact")
     plan.add_argument("--extraction-path", help="Path to extraction JSON artifact")
     plan.add_argument("--paper-id", help="Paper id to load from data/extractions/<paper_id>.json")
+    plan.add_argument("--input-json", help="Path to unified four-key Planner input JSON")
     plan.add_argument(
         "--non-interactive",
         action="store_true",
@@ -572,6 +624,7 @@ def main() -> int:
                 extraction_path=args.extraction_path,
                 paper_id=args.paper_id,
                 non_interactive=args.non_interactive,
+                input_json=args.input_json,
             )
         if args.command == "execute":
             return run_execute(

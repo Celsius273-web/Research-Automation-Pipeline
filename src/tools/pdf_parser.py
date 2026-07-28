@@ -8,6 +8,7 @@ from pathlib import Path
 import fitz
 
 from src.state import SECTION_NAMES, SectionTextMap
+from src.tools.pdf_tables import append_tables_to_sections, extract_tables_markdown
 
 
 HEADING_PATTERNS: dict[str, list[str]] = {
@@ -132,4 +133,10 @@ def split_sections(text: str) -> SectionTextMap:
 
 def parse_pdf_sections(pdf_path: str | Path) -> SectionTextMap:
     raw_text = extract_pdf_text(pdf_path)
-    return split_sections(raw_text)
+    sections = split_sections(raw_text)
+    tables_markdown = extract_tables_markdown(pdf_path)
+    if not tables_markdown:
+        return sections
+
+    payload = append_tables_to_sections(sections.model_dump(), tables_markdown)
+    return SectionTextMap(**payload)

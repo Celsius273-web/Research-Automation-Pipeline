@@ -7,21 +7,23 @@ import logging
 import re
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from urllib import error, request
 
 from pydantic import ValidationError
 
+from src.agents.planner_debug import PlannerDebugTrace, write_planner_debug_files
 from src.agents.prompts.planner_prompt import build_planner_system_prompt
 from src.config import MODEL_NUM_PREDICT, MODEL_TEMPERATURE, OLLAMA_HOST, PLANNER_MODEL, PLANNER_MAX_RETRIES
+from src.planner_input import build_unified_planner_input
 from src.state import (
     AgentEnvelope,
     ExecutionPlan,
     PlannerInputContext,
     PlannerPayload,
-    PlannerPayloadCore,
-    PlannerPayloadExtensions,
     PlanStep,
-    ExperimentSpec,
+    SectionExtraction,
+    UnifiedPlannerInput,
 )
 
 logger = logging.getLogger(__name__)
@@ -29,6 +31,22 @@ logger = logging.getLogger(__name__)
 STRICT_RETRY_REMINDER = (
     "Your previous response was empty or invalid. Return only the JSON object matching the schema above,"
     " with every field populated."
+)
+
+AIM_GROUNDING_RETRY_REMINDER = (
+    "Research question was provided in analyst_output; do not mark it unknown. "
+    "Restate the paper aim in objective, then plan repo steps for the Engineer."
+)
+
+METHODOLOGY_AIM_RETRY_REMINDER = (
+    "flags.has_research_question is false but methodology is present. "
+    "Do not block. Synthesize objective from methodology, leave unknown entrypoints as empty "
+    "run_command with unknowns, and use status partial or ok."
+)
+
+BLOCKED_SOFTEN_RETRY_REMINDER = (
+    "Do not use status blocked when methodology or research_question is present. "
+    "Use status partial, keep unknowns, and continue planning from available context."
 )
 
 
@@ -47,6 +65,84 @@ def _ensure_list_str(value: object) -> list[str]:
         return []
     text = str(value).strip()
     return [text] if text else []
+
+
+def _extraction_to_analyst_dict(extraction: SectionExtraction) -> dict[str, object]:
+    """Serialize SectionExtraction into the analyst_output shape sent to the LLM."""
+    return {
+        "research_question": extraction.research_question,
+        "methodology": extraction.methodology,
+        "datasets_or_benchmarks": extraction.datasets_or_benchmarks,
+        "variables": extraction.variables,
+        "hyperparameters": dict(extraction.hyperparameters),
+        "evaluation_metrics": extraction.evaluation_metrics,
+        "reported_results": [item.model_dump() for item in extraction.reported_results],
+        "notes": extraction.notes,
+    }
+
+
+def _is_present_research_question(value: str) -> bool:
+    text = (value or "").strip()
+    return bool(text) and not text.startswith("unknown:")
+
+
+def _unknown_mentions_aim(unknowns: list[object]) -> bool:
+    """True if unknowns claim research_question / aim is missing."""
+    for item in unknowns:
+        field = ""
+        if hasattr(item, "field"):
+            field = str(getattr(item, "field", "")).lower()
+        elif isinstance(item, dict):
+            field = str(item.get("field", "")).lower()
+        if "research_question" in field or field.endswith(".aim") or field == "aim":
+            return True
+    return False
+
+
+def _plan_misses_aim(
+    research_question: str,
+    methodology: str,
+    plan: AgentEnvelope[PlannerPayload] | ExecutionPlan,
+) -> bool:
+    """Soft gate: present aim sources must yield a non-empty objective/summary."""
+    has_rq = _is_present_research_question(research_question)
+    has_method = bool((methodology or "").strip()) and not (methodology or "").strip().lower().startswith(
+        "unknown:"
+    )
+    if not has_rq and not has_method:
+        return False
+
+    if isinstance(plan, AgentEnvelope):
+        if has_rq and _unknown_mentions_aim(list(plan.unknowns)):
+            return True
+        core = plan.payload.core
+        return not (core.objective or "").strip() or not (core.plan_summary or "").strip()
+
+    return not (plan.objective or "").strip() or not (plan.plan_summary or "").strip()
+
+
+def _should_soften_blocked(
+    research_question: str,
+    methodology: str,
+    plan: AgentEnvelope[PlannerPayload],
+) -> bool:
+    """Blocked is only valid when both RQ and methodology are absent."""
+    if plan.status != "blocked":
+        return False
+    has_rq = _is_present_research_question(research_question)
+    has_method = bool((methodology or "").strip()) and not (methodology or "").strip().lower().startswith(
+        "unknown:"
+    )
+    return has_rq or has_method
+
+
+def _soften_blocked_envelope(plan: AgentEnvelope[PlannerPayload]) -> AgentEnvelope[PlannerPayload]:
+    """Downgrade an over-aggressive blocked response to partial."""
+    warnings = list(plan.warnings)
+    note = "status downgraded from blocked to partial because methodology or research_question is present"
+    if note not in warnings:
+        warnings.append(note)
+    return plan.model_copy(update={"status": "partial", "warnings": warnings})
 
 
 def _normalize_legacy_plan_payload(payload: dict[str, object]) -> dict[str, object]:
@@ -113,8 +209,7 @@ def _convert_envelope_to_legacy_plan(envelope: AgentEnvelope[PlannerPayload]) ->
     """Convert new envelope structure to legacy ExecutionPlan format."""
     core = envelope.payload.core
     ext = envelope.payload.extensions
-    
-    # Convert core steps to legacy format
+
     legacy_steps = [
         PlanStep(
             step_id=step.step_id,
@@ -130,7 +225,7 @@ def _convert_envelope_to_legacy_plan(envelope: AgentEnvelope[PlannerPayload]) ->
         )
         for step in core.steps
     ]
-    
+
     return ExecutionPlan(
         schema_version="1.0",
         plan_summary=core.plan_summary,
@@ -146,211 +241,171 @@ def _convert_envelope_to_legacy_plan(envelope: AgentEnvelope[PlannerPayload]) ->
     )
 
 
+def _resolve_debug_dir(context: PlannerInputContext | UnifiedPlannerInput) -> Path:
+    if isinstance(context, PlannerInputContext) and context.paper_bundle_path:
+        return Path(context.paper_bundle_path)
+    paper = context.paper if isinstance(context, PlannerInputContext) else context.paper_context
+    return Path("data") / "papers" / paper.paper_id
+
+
+def _write_debug_trace(
+    context: PlannerInputContext | UnifiedPlannerInput,
+    trace: PlannerDebugTrace,
+) -> None:
+    output_dir = _resolve_debug_dir(context)
+    json_path, md_path = write_planner_debug_files(trace, output_dir, saved_plan=None)
+    logger.info("Planner debug written to %s (and %s)", md_path, json_path)
+
+
 @dataclass
 class PaperPlanner:
     model: str = PLANNER_MODEL
     max_parse_retries: int = PLANNER_MAX_RETRIES
 
-    def _call_ollama_json(self, context: PlannerInputContext) -> AgentEnvelope[PlannerPayload] | ExecutionPlan:
-        extraction = context.approved_extraction
-        system_prompt = build_planner_system_prompt(
-            domain_vocabulary_block=(
-                "- bayesian optimization\n"
-                "- gaussian process surrogate\n"
-                "- acquisition function\n"
-                "- evaluation budget\n"
-                "- regret"
-            )
+    def _call_ollama_json(
+        self,
+        context: PlannerInputContext | UnifiedPlannerInput,
+    ) -> AgentEnvelope[PlannerPayload]:
+        unified_input = (
+            context
+            if isinstance(context, UnifiedPlannerInput)
+            else build_unified_planner_input(context)
         )
-        analyst_structured = {
-            "research_question": extraction.research_question or "unknown: missing research question",
-            "methodology": extraction.methodology or "unknown: missing methodology",
-            "datasets": extraction.datasets_or_benchmarks
-            or ["unknown: no datasets identified"],
-            "variables": extraction.variables or ["unknown: no variables identified"],
-            "hyperparameters": [
-                {"name": key, "value": value}
-                for key, value in extraction.hyperparameters.items()
-            ]
-            or [{"name": "unknown", "value": "unknown: no hyperparameters identified"}],
-            "evaluation_metrics": extraction.evaluation_metrics
-            or ["unknown: no evaluation metrics identified"],
-        }
-        
-        # #region DEBUG: Log analyst output (H1, H3)
-        logger.info("PLANNER_ANALYST_STRUCTURED: rq_empty=%s, methodology_empty=%s, datasets_count=%d, vars_count=%d, hyper_count=%d, metrics_count=%d",
-                    analyst_structured["research_question"].startswith("unknown"),
-                    analyst_structured["methodology"].startswith("unknown"),
-                    len(analyst_structured["datasets"]),
-                    len(analyst_structured["variables"]),
-                    len(analyst_structured["hyperparameters"]),
-                    len(analyst_structured["evaluation_metrics"]))
-        # #endregion
-        
-        # Build section-by-section context if available
-        sections_structured = {}
-        if context.extraction_sections:
-            for section_name, section_extraction in context.extraction_sections.items():
-                sections_structured[section_name] = {
-                    "research_question": section_extraction.research_question,
-                    "methodology": section_extraction.methodology,
-                    "datasets": section_extraction.datasets_or_benchmarks,
-                    "variables": section_extraction.variables,
-                    "hyperparameters": {k: v for k, v in section_extraction.hyperparameters.items()},
-                    "evaluation_metrics": section_extraction.evaluation_metrics,
-                }
-        
-        # #region DEBUG: Log sections structure (H2)
-        logger.info("PLANNER_SECTIONS_DEBUG: extraction_sections provided=%s, sections_structured keys=%s, total_vars=%d, total_hyper=%d",
-                    bool(context.extraction_sections),
-                    list(sections_structured.keys()) if sections_structured else "empty",
-                    sum(len(s.get("variables", [])) for s in sections_structured.values()),
-                    sum(len(s.get("hyperparameters", {})) for s in sections_structured.values()))
-        # #endregion
-        
-        payload = {
-            "paper": context.paper.model_dump(),
-            "analyst_output": analyst_structured,
-            "extraction_sections": sections_structured,
-            "runtime_constraints": context.runtime_constraints,
-            "repo_context": context.repo_context,
-            "repo_setup_guide": context.repo_setup_guide,
-            "hyperparameter_reference": context.hyperparameter_reference,
-        }
-       # After building payload dict, before creating prompt:
-        extraction_sections_instruction = ""
-        if context.extraction_sections:
-            extraction_sections_instruction = """
-        IMPORTANT: You received extraction_sections (section-by-section extraction).
-        Use this to infer experiment structure:
-        - Group variables and metrics by section into natural experiments
-        - Each section often represents one experimental parameter sweep
-        - Populate experiment_matrix with one entry per distinct experiment
-        """
+        research_question = unified_input.analyst_output.research_question
+        methodology = unified_input.analyst_output.methodology
+        system_prompt = build_planner_system_prompt()
+        payload = unified_input.model_dump()
 
-        # #region DEBUG: Log system prompt (H4)
-        try:
-            system_prompt = build_planner_system_prompt(domain_vocabulary_block="")
-            logger.info("PLANNER_SYSTEM_PROMPT_CHECK: length=%d, has_extraction_sections_mention=%s",
-                        len(system_prompt),
-                        "extraction_sections" in system_prompt)
-        except Exception as e:
-            logger.error("PLANNER_SYSTEM_PROMPT_ERROR: %s", str(e))
-        # #endregion
-        
+        trace = PlannerDebugTrace(
+            paper_id=unified_input.paper_context.paper_id,
+            model=self.model,
+            received_context=payload,
+            system_prompt=system_prompt,
+        )
+
         prompt = f"""
-        Create a structured execution plan from the approved extraction context.
-        {extraction_sections_instruction}
-        Prioritize reproducibility and deterministic validation steps.
-        Keep each action concrete and implementation-oriented.
+        Create an Engineer-ready execution plan from this unified Planner input.
+        Use analyst_output as ground truth and honor repo_context and flags.
 
         Context JSON:
         {json.dumps(payload, indent=2)}
         """.strip()
-        
-        # #region DEBUG: Log payload structure (H3)
-        logger.info("PLANNER_PAYLOAD_JSON: analyst_output keys=%s, extraction_sections keys=%s, repo_context present=%s",
-                    list(payload.get("analyst_output", {}).keys()),
-                    list(payload.get("extraction_sections", {}).keys()),
-                    bool(payload.get("repo_context")))
-        logger.info("PLANNER_PROMPT_LENGTH: %d chars, extraction_sections_instruction=%s",
-                    len(prompt),
-                    "PRESENT" if extraction_sections_instruction else "MISSING")
-        # #endregion
 
         last_error: Exception | None = None
         raw_response: str = ""
-        for attempt in range(self.max_parse_retries + 1):
-            attempt_prompt = prompt
-            if attempt > 0:
-                attempt_prompt = f"{prompt}\n\n{STRICT_RETRY_REMINDER}"
-            req_payload = {
-                "model": self.model,
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": attempt_prompt},
-                ],
-                "stream": False,
-                "think": False,
-                "format": "json",
-                "options": {
-                    "temperature": MODEL_TEMPERATURE,
-                    "num_predict": MODEL_NUM_PREDICT,
-                },
-            }
-            logger.info("Planner prompt payload: %s", json.dumps(req_payload, indent=2))
-            try:
-                req = request.Request(
-                    f"{OLLAMA_HOST}/api/chat",
-                    method="POST",
-                    data=json.dumps(req_payload).encode("utf-8"),
-                    headers={"Content-Type": "application/json"},
+        parse_failures = 0
+        aim_retry_used = False
+        blocked_retry_used = False
+        use_aim_reminder = False
+        use_blocked_reminder = False
+        use_method_aim_reminder = False
+
+        try:
+            while parse_failures <= self.max_parse_retries:
+                reminder = "none"
+                attempt_prompt = prompt
+                if use_aim_reminder:
+                    attempt_prompt = f"{prompt}\n\n{AIM_GROUNDING_RETRY_REMINDER}"
+                    reminder = "aim"
+                    use_aim_reminder = False
+                elif use_method_aim_reminder:
+                    attempt_prompt = f"{prompt}\n\n{METHODOLOGY_AIM_RETRY_REMINDER}"
+                    reminder = "method_aim"
+                    use_method_aim_reminder = False
+                elif use_blocked_reminder:
+                    attempt_prompt = f"{prompt}\n\n{BLOCKED_SOFTEN_RETRY_REMINDER}"
+                    reminder = "blocked"
+                    use_blocked_reminder = False
+                elif parse_failures > 0:
+                    attempt_prompt = f"{prompt}\n\n{STRICT_RETRY_REMINDER}"
+                    reminder = "strict"
+
+                attempt = trace.add_attempt(
+                    reminder=reminder,
+                    user_prompt=attempt_prompt,
+                    system_prompt=system_prompt,
                 )
-                with request.urlopen(req, timeout=180) as response:
-                    body = json.loads(response.read().decode("utf-8"))
-                raw_response = str(body.get("message", {}).get("content", ""))
-                
-                # #region DEBUG: Log raw response (H5)
-                logger.info("PLANNER_OLLAMA_RESPONSE: length=%d, is_empty=%s, first_100_chars=%s",
-                            len(raw_response),
-                            raw_response.strip() == "",
-                            raw_response[:100] if raw_response else "NONE")
-                # #endregion
-                
-                logger.info("Planner raw response: %s", raw_response)
-                if not raw_response.strip():
-                    raise json.JSONDecodeError("Empty model response", "", 0)
-                parsed = json.loads(_clean_json_response(raw_response))
-                
-                # #region DEBUG: Log parsed JSON (H5)
-                logger.info("PLANNER_PARSED_JSON: top_level_keys=%s, has_execution_plan=%s",
-                            list(parsed.keys()),
-                            "execution_plan" in parsed)
-                if "execution_plan" in parsed:
-                    ep = parsed["execution_plan"]
-                    logger.info("PLANNER_EXECUTION_PLAN_CONTENT: plan_summary_empty=%s, domain_empty=%s, objective_empty=%s, steps_count=%d, exp_matrix_count=%d",
-                                ep.get("plan_summary", "") == "",
-                                ep.get("domain", "") == "",
-                                ep.get("objective", "") == "",
-                                len(ep.get("steps", [])),
-                                len(ep.get("experiment_matrix", [])))
-                # #endregion
-                
-                # Try parsing as new envelope format first
-                if "schema_version" in parsed and parsed.get("schema_version") == "2.0":
+
+                req_payload = {
+                    "model": self.model,
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": attempt_prompt},
+                    ],
+                    "stream": False,
+                    "think": False,
+                    "format": "json",
+                    "options": {
+                        "temperature": MODEL_TEMPERATURE,
+                        "num_predict": MODEL_NUM_PREDICT,
+                    },
+                }
+                try:
+                    req = request.Request(
+                        f"{OLLAMA_HOST}/api/chat",
+                        method="POST",
+                        data=json.dumps(req_payload).encode("utf-8"),
+                        headers={"Content-Type": "application/json"},
+                    )
+                    with request.urlopen(req, timeout=180) as response:
+                        body = json.loads(response.read().decode("utf-8"))
+                    raw_response = str(body.get("message", {}).get("content", ""))
+                    attempt.raw_response = raw_response
+
+                    if not raw_response.strip():
+                        raise json.JSONDecodeError("Empty model response", "", 0)
+                    parsed = json.loads(_clean_json_response(raw_response))
+                    attempt.parsed = parsed
+
                     envelope = AgentEnvelope[PlannerPayload].model_validate(parsed)
-                    
-                    # Check status and log warnings/unknowns
-                    if envelope.status == "blocked":
-                        raise RuntimeError(
-                            f"Planner blocked. Unknowns: {envelope.unknowns}, Warnings: {envelope.warnings}"
-                        )
-                    if envelope.unknowns:
-                        logger.warning("Planner has unknowns: %s", envelope.unknowns)
-                    if envelope.warnings:
-                        logger.warning("Planner warnings: %s", envelope.warnings)
-                    
-                    # Core fields are validated by Pydantic; extensions are optional
+                    if envelope.schema_version != "2.0" or envelope.agent != "planner":
+                        raise ValueError("Planner response must use schema_version 2.0 and agent planner")
+                    if envelope.status not in {"ok", "partial", "blocked"}:
+                        raise ValueError("Planner status must be ok, partial, or blocked")
+
+                    if _should_soften_blocked(research_question, methodology, envelope):
+                        if not blocked_retry_used:
+                            attempt.outcome = "blocked_retry"
+                            blocked_retry_used = True
+                            use_blocked_reminder = True
+                            continue
+                        envelope = _soften_blocked_envelope(envelope)
+
+                    if _plan_misses_aim(research_question, methodology, envelope) and not aim_retry_used:
+                        attempt.outcome = "aim_retry"
+                        aim_retry_used = True
+                        if _is_present_research_question(research_question):
+                            use_aim_reminder = True
+                        else:
+                            use_method_aim_reminder = True
+                        continue
+                    attempt.outcome = "accepted"
+                    trace.final_output = envelope.model_dump()
                     return envelope
-                else:
-                    # Fall back to legacy format
-                    logger.info("Parsing as legacy plan format")
-                    normalized = _normalize_legacy_plan_payload(parsed)
-                    return ExecutionPlan.model_validate(normalized)
-            except (
-                json.JSONDecodeError,
-                error.URLError,
-                error.HTTPError,
-                TimeoutError,
-                ValidationError,
-            ) as exc:
-                last_error = exc
-                time.sleep(1.5 * (attempt + 1))
+                except (
+                    json.JSONDecodeError,
+                    error.URLError,
+                    error.HTTPError,
+                    TimeoutError,
+                    ValidationError,
+                    ValueError,
+                ) as exc:
+                    last_error = exc
+                    attempt.error = str(exc)
+                    attempt.outcome = "error"
+                    parse_failures += 1
+                    time.sleep(1.5 * parse_failures)
 
-        raise RuntimeError(
-            "Failed to build planner JSON after retry. "
-            f"last_error={last_error}. raw_response={raw_response!r}"
-        )
+            trace.final_error = (
+                f"Failed to build planner JSON after retry. last_error={last_error}. "
+                f"raw_response={raw_response!r}"
+            )
+            raise RuntimeError(trace.final_error)
+        finally:
+            _write_debug_trace(context, trace)
 
-    def build_plan(self, context: PlannerInputContext) -> AgentEnvelope[PlannerPayload] | ExecutionPlan:
+    def build_plan(
+        self,
+        context: PlannerInputContext | UnifiedPlannerInput,
+    ) -> AgentEnvelope[PlannerPayload]:
         return self._call_ollama_json(context)

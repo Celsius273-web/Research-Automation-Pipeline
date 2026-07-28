@@ -10,7 +10,16 @@ from urllib import error, request
 from pydantic import ValidationError
 
 from src.agents.prompts.analyst_prompt import build_analyst_system_prompt
-from src.config import ANALYST_MODEL, ANALYST_SECTION_CHARS, MODEL_NUM_PREDICT, MODEL_TEMPERATURE, OLLAMA_HOST
+from src.config import (
+    ANALYST_MAX_RESULT_CHUNKS,
+    ANALYST_MODEL,
+    ANALYST_NUM_PREDICT,
+    ANALYST_RESULT_CHUNK_OVERLAP,
+    ANALYST_RESULT_SECTION_CHARS,
+    ANALYST_SECTION_CHARS,
+    MODEL_TEMPERATURE,
+    OLLAMA_HOST,
+)
 from src.state import (
     ExtractionBundle,
     ReportedResult,
@@ -65,6 +74,45 @@ _SCHEMA_REMINDER = (
     '"reported_results":[],"notes":""}'
 )
 
+_RESULT_FOCUS_SECTIONS = frozenset({"experiments", "appendix"})
+
+_WEAK_RESULT_VALUE_PREFIXES = (
+    "see table",
+    "see figure",
+    "refer to table",
+    "refer to figure",
+    "as shown in table",
+    "as shown in figure",
+    "reported in table",
+    "reported in tab",
+)
+
+_TOOLKIT_TERMS = (
+    "library",
+    "toolkit",
+    "software package",
+    "framework implementing",
+    "open-source",
+)
+
+_VAGUE_DATASET_PHRASES = (
+    "synthetic",
+    "real-world",
+    "various domains",
+    "various datasets",
+    "benchmark problems",
+    "standard benchmarks",
+    "unknown",
+)
+
+_JUNK_DATASET_MARKERS = (
+    "lemma",
+    "theorem",
+    "corollary",
+    "et al",
+    "implementation details",
+)
+
 
 def _build_retry_reminder(last_error: Exception | None) -> str:
     """Build a targeted retry prompt that names the exact fields to remove."""
@@ -106,6 +154,119 @@ def _dedupe_keep_order(values: list[str]) -> list[str]:
     return out
 
 
+def _is_present_text(value: str) -> bool:
+    text = (value or "").strip()
+    return bool(text) and not text.lower().startswith("unknown:")
+
+
+def _looks_like_toolkit(methodology: str, notes: str = "") -> bool:
+    description = f"{methodology} {notes}".lower()
+    return any(term in description for term in _TOOLKIT_TERMS)
+
+
+def _is_junk_dataset(name: str) -> bool:
+    text = name.strip().lower()
+    if not text:
+        return True
+    if any(marker in text for marker in _JUNK_DATASET_MARKERS):
+        return True
+    if any(phrase in text for phrase in _VAGUE_DATASET_PHRASES) and len(text.split()) <= 5:
+        return True
+    return False
+
+
+def _clean_datasets(values: list[str]) -> list[str]:
+    return _dedupe_keep_order([item for item in values if not _is_junk_dataset(item)])
+
+
+def _has_numeric_value(value: str) -> bool:
+    """True when value contains a digit suitable for reproduction comparison."""
+    text = (value or "").strip()
+    if not text or text in {"}", "{", "}, {", "], ["}:
+        return False
+    return bool(re.search(r"\d", text))
+
+
+def _clean_reported_results(results: list[ReportedResult]) -> list[ReportedResult]:
+    cleaned: list[ReportedResult] = []
+    for item in results:
+        metric = (item.metric_name or "").strip()
+        value = (item.value or "").strip()
+        if not metric or not value:
+            continue
+        lowered = value.lower()
+        if any(lowered.startswith(prefix) for prefix in _WEAK_RESULT_VALUE_PREFIXES):
+            continue
+        if lowered in {"n/a", "na", "none", "-", "null"}:
+            continue
+        if not _has_numeric_value(value):
+            continue
+        cleaned.append(item)
+    return cleaned
+
+
+def chunk_section_text(
+    text: str,
+    chunk_size: int = ANALYST_RESULT_SECTION_CHARS,
+    overlap: int = ANALYST_RESULT_CHUNK_OVERLAP,
+    max_chunks: int = ANALYST_MAX_RESULT_CHUNKS,
+) -> list[str]:
+    """Split long result-heavy sections into overlapping windows."""
+    content = (text or "").strip()
+    if not content:
+        return []
+    if len(content) <= chunk_size:
+        return [content]
+
+    chunks: list[str] = []
+    start = 0
+    step = max(chunk_size - overlap, 1)
+    while start < len(content) and len(chunks) < max_chunks:
+        end = min(start + chunk_size, len(content))
+        chunks.append(content[start:end])
+        if end >= len(content):
+            break
+        start += step
+    return chunks
+
+
+def merge_chunk_extractions(chunks: list[SectionExtraction]) -> SectionExtraction:
+    """Merge multiple extractions from the same section's text windows."""
+    if not chunks:
+        return SectionExtraction()
+    if len(chunks) == 1:
+        return chunks[0]
+
+    merged = SectionExtraction()
+    merged_reported: dict[tuple[str, str, str], ReportedResult] = {}
+    for chunk in chunks:
+        if not merged.research_question and chunk.research_question:
+            merged.research_question = chunk.research_question
+        if not merged.methodology and chunk.methodology:
+            merged.methodology = chunk.methodology
+        merged.datasets_or_benchmarks = _dedupe_keep_order(
+            merged.datasets_or_benchmarks + chunk.datasets_or_benchmarks
+        )
+        merged.variables = _dedupe_keep_order(merged.variables + chunk.variables)
+        merged.evaluation_metrics = _dedupe_keep_order(
+            merged.evaluation_metrics + chunk.evaluation_metrics
+        )
+        for item in chunk.reported_results:
+            key = (
+                item.benchmark.strip().lower(),
+                item.metric_name.strip().lower(),
+                item.value.strip().lower(),
+            )
+            merged_reported[key] = item
+        for key, value in chunk.hyperparameters.items():
+            if key not in merged.hyperparameters and str(value).strip():
+                merged.hyperparameters[key] = str(value).strip()
+        if chunk.notes:
+            merged.notes = (merged.notes + "\n" + chunk.notes).strip()
+    merged.reported_results = list(merged_reported.values())
+    return merged
+
+
 def merge_section_extractions(
     extractions: dict[str, SectionExtraction],
 ) -> SectionExtraction:
@@ -141,12 +302,64 @@ def merge_section_extractions(
     return merged
 
 
+def soft_fill_research_question(
+    extraction: SectionExtraction,
+    paper_title: str = "",
+) -> SectionExtraction:
+    """Fill empty RQ from toolkit/methodology/title and mark the inference in notes."""
+    if _is_present_text(extraction.research_question):
+        return extraction
+
+    methodology = (extraction.methodology or "").strip()
+    title = (paper_title or "").strip()
+    notes = extraction.notes or ""
+
+    if _looks_like_toolkit(methodology, notes):
+        purpose = methodology or title or "an open-source research toolkit"
+        filled = f"Toolkit paper: {purpose}"
+        inference_note = (
+            "[inferred] research_question: toolkit paper purpose synthesized from methodology/title"
+        )
+    elif methodology:
+        filled = f"How can we implement and evaluate the following method: {methodology}"
+        inference_note = "[inferred] research_question synthesized from methodology"
+    elif title:
+        filled = f"What scientific contribution does '{title}' make, and how can it be reproduced?"
+        inference_note = "[inferred] research_question synthesized from paper title"
+    else:
+        return extraction
+
+    if len(filled) > 500:
+        filled = filled[:497].rstrip() + "..."
+
+    updated_notes = (notes + "\n" + inference_note).strip()
+    return extraction.model_copy(
+        update={
+            "research_question": filled,
+            "notes": updated_notes,
+        }
+    )
+
+
+def finalize_merged_extraction(
+    extraction: SectionExtraction,
+    paper_title: str = "",
+) -> SectionExtraction:
+    """Deterministic cleanup + soft-fill after section merge."""
+    cleaned = extraction.model_copy(
+        update={
+            "datasets_or_benchmarks": _clean_datasets(extraction.datasets_or_benchmarks),
+            "reported_results": _clean_reported_results(extraction.reported_results),
+        }
+    )
+    return soft_fill_research_question(cleaned, paper_title=paper_title)
+
+
 _DEFAULT_DOMAIN_VOCAB = (
-    "- bayesian optimization\n"
-    "- surrogate model\n"
-    "- acquisition function\n"
-    "- black-box objective\n"
-    "- sample efficiency"
+    "- named datasets and benchmarks\n"
+    "- experimental hyperparameters and numeric settings\n"
+    "- evaluation metrics\n"
+    "- algorithmic methods and toolkit purpose statements"
 )
 
 
@@ -160,13 +373,16 @@ class PaperAnalyst:
         system_prompt = build_analyst_system_prompt(
             domain_vocabulary_block=self.domain_vocabulary
         )
+        # Caller already sized the window; keep a hard cap as a safety net.
+        clipped = section_text[: max(ANALYST_SECTION_CHARS, ANALYST_RESULT_SECTION_CHARS)]
         prompt = f"""
 Section name: {section}
 
-Extract fields from this section only.
+Extract fields from this section only. For experiments/appendix chunks, prioritize
+copying quantitative table and figure results into reported_results with non-empty values.
 
 Text:
-{section_text[:ANALYST_SECTION_CHARS]}
+{clipped}
 """.strip()
 
         last_error: Exception | None = None
@@ -186,7 +402,7 @@ Text:
                 "format": _SECTION_EXTRACTION_JSON_SCHEMA,
                 "options": {
                     "temperature": MODEL_TEMPERATURE,
-                    "num_predict": MODEL_NUM_PREDICT,
+                    "num_predict": ANALYST_NUM_PREDICT,
                 },
             }
             logger.info("Analyst prompt (section=%s): %s", section, attempt_prompt)
@@ -222,18 +438,51 @@ Text:
             f"'{section}' after retry. last_error={last_error}. raw_response={raw_response!r}"
         )
 
-    def extract(self, sections: SectionTextMap) -> ExtractionBundle:
+    def _extract_section(self, section: str, text: str) -> SectionExtraction:
+        """Extract one section, chunking experiments/appendix so result tables are covered."""
+        if section not in _RESULT_FOCUS_SECTIONS:
+            return self._call_ollama_json(section, text[:ANALYST_SECTION_CHARS])
+
+        windows = chunk_section_text(text)
+        if not windows:
+            return SectionExtraction()
+        if len(windows) == 1:
+            return self._call_ollama_json(section, windows[0])
+
+        chunk_extractions: list[SectionExtraction] = []
+        for idx, window in enumerate(windows, start=1):
+            label = f"{section} (chunk {idx}/{len(windows)})"
+            logger.info(
+                "Analyst chunking section=%s chunk=%s/%s chars=%s",
+                section,
+                idx,
+                len(windows),
+                len(window),
+            )
+            try:
+                chunk_extractions.append(self._call_ollama_json(label, window))
+            except RuntimeError as exc:
+                logger.warning("Section '%s' chunk %s failed: %s", section, idx, exc)
+        if not chunk_extractions:
+            raise RuntimeError(f"All chunks failed for section '{section}'.")
+        return merge_chunk_extractions(chunk_extractions)
+
+    def extract(
+        self,
+        sections: SectionTextMap,
+        paper_title: str = "",
+    ) -> ExtractionBundle:
         by_section: dict[str, SectionExtraction] = {}
-        fallback_text = sections.full_text[:18000]
+        has_named_section_text = False
 
         for name in SECTION_NAMES:
             text = getattr(sections, name, "").strip()
             if not text:
-                text = fallback_text
-            if not text:
-                raise RuntimeError(f"No usable text available for section '{name}'.")
+                by_section[name] = SectionExtraction()
+                continue
+            has_named_section_text = True
             try:
-                by_section[name] = self._call_ollama_json(name, text)
+                by_section[name] = self._extract_section(name, text)
             except RuntimeError as exc:
                 # Partial extraction is better than total failure. Log the
                 # section error and continue so the merged result and file
@@ -241,5 +490,21 @@ Text:
                 logger.warning("Section '%s' extraction failed after retries: %s", name, exc)
                 by_section[name] = SectionExtraction()
 
-        merged = merge_section_extractions(by_section)
+        if not has_named_section_text:
+            fallback_text = (sections.full_text or "").strip()
+            if not fallback_text:
+                raise RuntimeError("No usable text available for any section.")
+            try:
+                by_section["abstract"] = self._call_ollama_json(
+                    "abstract",
+                    fallback_text[:ANALYST_SECTION_CHARS],
+                )
+            except RuntimeError as exc:
+                logger.warning("Fallback abstract extraction failed: %s", exc)
+                raise RuntimeError("No usable text available for any section.") from exc
+
+        merged = finalize_merged_extraction(
+            merge_section_extractions(by_section),
+            paper_title=paper_title,
+        )
         return ExtractionBundle(by_section=by_section, merged=merged)

@@ -26,6 +26,7 @@ from src.state import (
     ReportedResult,
     ResearchState,
     ReviewRecord,
+    UnifiedPlannerInput,
 )
 from src.tools.docker_executor import DockerExecutor
 from src.tools.pdf_parser import parse_pdf_sections
@@ -48,7 +49,8 @@ def make_phase1_nodes(non_interactive: bool):
         return state
 
     def analyst_node(state: ResearchState) -> ResearchState:
-        extraction = analyst.extract(state["section_texts"])
+        paper = state["paper"]
+        extraction = analyst.extract(state["section_texts"], paper_title=paper.title)
         state["extraction"] = extraction
         return state
 
@@ -66,71 +68,37 @@ def make_phase1_nodes(non_interactive: bool):
     return parse_node, analyst_node, review_node
 
 
-def make_planner_node(non_interactive: bool):
+def make_planner_node(
+    non_interactive: bool,
+    unified_input: UnifiedPlannerInput | None = None,
+):
     planner = PaperPlanner()
 
     def planner_node(state: ResearchState) -> ResearchState:
         paper = state["paper"]
-        paper_bundle = PaperBundle(paper.paper_id)
-        
-        # Load extraction from state, or from disk if plan-only flow
-        if "extraction" not in state:
-            extraction = paper_bundle.get_extraction()
+        if unified_input is not None:
+            context: PlannerInputContext | UnifiedPlannerInput = unified_input
+        else:
+            paper_bundle = PaperBundle(paper.paper_id)
+            extraction = state.get("extraction")
+            if extraction is None or not extraction.merged.model_dump(exclude_defaults=True):
+                extraction = paper_bundle.get_extraction()
             if not extraction:
                 state["errors"].append("No extraction found for paper; run analyst first")
                 return state
-        else:
-            extraction = state["extraction"]
-        
-        # #region DEBUG: Log extraction state (H1)
-        import json
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info("PLANNER_NODE_EXTRACTION_DEBUG: extraction type=%s, merged=%s, by_section keys=%s", 
-                    type(extraction).__name__,
-                    "None" if extraction.merged is None else f"research_q={bool(extraction.merged.research_question)}, vars={len(extraction.merged.variables)}, hyper={len(extraction.merged.hyperparameters)}",
-                    list(extraction.by_section.keys()) if extraction.by_section else "None")
-        # #endregion
-        
-        # Load rich context from paper bundle
-        repo_context = paper_bundle.get_repo_info()
-        repo_setup_guide = paper_bundle.get_setup_guide()
-        hyperparameter_reference = paper_bundle.get_hyperparameter_reference()
-        
-        # Convert repo_context to dict for backwards compatibility
-        repo_context_dict = {
-            "repo_url": repo_context.repo_url,
-            "repo_path": repo_context.repo_path,
-            "language": repo_context.language,
-            "build_system": repo_context.build_system,
-            "notes": repo_context.notes,
-        }
-        
-        # #region DEBUG: Log context being built (H2, H3)
-        logger.info("PLANNER_CONTEXT_BUILD: merged has research_q=%s, %d vars, %d hyper; by_section has %d sections",
-                    bool(extraction.merged.research_question) if extraction.merged else "None",
-                    len(extraction.merged.variables) if extraction.merged else 0,
-                    len(extraction.merged.hyperparameters) if extraction.merged else 0,
-                    len(extraction.by_section) if extraction.by_section else 0)
-        # #endregion
-        
-        context = PlannerInputContext(
-            paper=paper,
-            approved_extraction=extraction.merged,
-            extraction_sections=extraction.by_section,
-            runtime_constraints=default_runtime_constraints(),
-            repo_context=repo_context_dict,
-            repo_setup_guide=repo_setup_guide,
-            hyperparameter_reference=hyperparameter_reference,
-            extraction_file_path=str(paper_bundle.extraction_path),
-            paper_bundle_path=str(paper_bundle.bundle_dir),
-        )
-        
-        # #region DEBUG: Log context passed to planner (H3)
-        logger.info("PLANNER_CONTEXT_READY: extraction_sections in context=%s, has %d sections",
-                    bool(context.extraction_sections),
-                    len(context.extraction_sections) if context.extraction_sections else 0)
-        # #endregion
+
+            repo_context = paper_bundle.get_repo_info()
+            context = PlannerInputContext(
+                paper=paper,
+                approved_extraction=extraction.merged,
+                extraction_sections=extraction.by_section,
+                runtime_constraints=default_runtime_constraints(),
+                repo_context=repo_context.model_dump(),
+                repo_setup_guide=paper_bundle.get_setup_guide(),
+                hyperparameter_reference=paper_bundle.get_hyperparameter_reference(),
+                extraction_file_path=str(paper_bundle.extraction_path),
+                paper_bundle_path=str(paper_bundle.bundle_dir),
+            )
         try:
             plan = planner.build_plan(context)
         except RuntimeError as exc:

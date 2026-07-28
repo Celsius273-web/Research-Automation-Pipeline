@@ -31,6 +31,7 @@ def detect_language(repo_path: str, repo_url: str = "") -> RepoContext:
             repo_path=str(root),
             language="python",
             build_system=build_system,
+            has_code=True,
             notes="Detected from Python marker files.",
         )
 
@@ -41,6 +42,7 @@ def detect_language(repo_path: str, repo_url: str = "") -> RepoContext:
             repo_path=str(root),
             language="cpp",
             build_system=build_system,
+            has_code=True,
             notes="Detected from C/C++ marker files.",
         )
 
@@ -50,7 +52,18 @@ def detect_language(repo_path: str, repo_url: str = "") -> RepoContext:
             repo_path=str(root),
             language="rust",
             build_system="cargo",
+            has_code=True,
             notes="Detected from Rust marker files.",
+        )
+
+    if any(root.rglob("*.py")):
+        return RepoContext(
+            repo_url=repo_url,
+            repo_path=str(root),
+            language="python",
+            build_system="unknown",
+            has_code=True,
+            notes="Detected from Python source files.",
         )
 
     return RepoContext(
@@ -58,5 +71,6 @@ def detect_language(repo_path: str, repo_url: str = "") -> RepoContext:
         repo_path=str(root),
         language="unknown",
         build_system="unknown",
+        has_code=any(root.iterdir()),
         notes="No known language marker files found.",
     )

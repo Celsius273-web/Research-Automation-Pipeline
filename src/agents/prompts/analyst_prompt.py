@@ -15,11 +15,24 @@ Objective: Extract structured, implementation-critical evidence from the provide
 
 Context Rules:
 1. You are called sequentially per section (e.g., abstract, method, experiments, hyperparameters, appendix).
-2. Do not infer, extrapolate, or combine insights from sections you have not seen in this specific execution turn.
-3. If the current section does not contain a field, use an empty string, empty list, or empty object for that field. Do not fabricate values.
+2. Do not invent numbers, benchmarks, or hyperparameters that are absent from this section.
+3. If the current section does not contain a field, use an empty string, empty list, or empty object for that field.
+4. Prefer empty over fabricated values. Downstream agents handle empty fields via flags.
 
 Domain Context (Injected at Runtime):
 {domain_block}
+
+Research Question Rules:
+- Prefer an explicit research question / problem statement from this section.
+- For toolkit/library papers, a valid research_question may describe the toolkit purpose
+  (e.g., "Toolkit paper: provide an open-source library for ..."). Do not leave it as "unknown".
+- If this section has no aim text, leave research_question empty (the merger may soft-fill later).
+
+Dataset / Benchmark Rules:
+- Include only named datasets, benchmarks, or test functions that appear in this section
+  (e.g., "Townsend Function (2D)", "HPO-B", "wiki-topcats").
+- Do NOT include: lemmas, theorems, citations, author names, vague phrases such as
+  "synthetic", "real-world benchmarks", "various datasets", or implementation references.
 
 Hyperparameter Extraction Rules (most commonly missed — follow carefully):
 - Scan prose AND tables for every numeric constant: learning rates, batch sizes, number of layers,
@@ -34,11 +47,22 @@ Evaluation Metric Extraction Rules:
 - List every metric by name: regret, simple regret, log regret, NLL, RMSE, accuracy, rank, etc.
 - Use the name exactly as it appears in the paper.
 
-Reported Result Extraction Rules:
-- Include every quantitative claim: tables, inline numbers like "3× faster", "achieves 0.12 regret".
-- Set "benchmark" to the dataset/environment name, "metric_name" to the metric, "value" to the
-  numeric or textual value, "source" to the table/figure reference (e.g. "Table 1", "Figure 3",
-  "abstract") or "text" if inline.
+Reported Result Extraction Rules (critical for reproduction):
+- Prefer quantitative values from any "## Extracted Tables" block in the text when present.
+- Extract concrete quantitative outcomes into reported_results. Prefer numbers from tables and
+  inline claims (e.g., "0.72 NMI", "regret 0.12", "2.6389E+02").
+- Each entry MUST include:
+  - benchmark: dataset / function / problem name
+  - metric_name: exact metric name (NMI, ARI, regret, objective value, runtime, ...)
+  - value: the actual number or short quantitative string containing a digit (never empty)
+  - source: "Table 3", "Figure 5", "abstract", or "text"
+- Do NOT emit placeholder rows that only cite a table/figure without copying the value
+  (bad: value="" or value="see Table 4").
+- Do NOT emit qualitative figure descriptions without numbers
+  (bad: "successfully outperforms baselines").
+- If a table has multiple rows/metrics, emit one reported_results entry per row/metric.
+- If this section has no quantitative outcomes, use an empty reported_results list.
+- Skip OCR/figure digitization; if a figure has no numeric caption/text, omit it.
 
 Strict Output Format:
 1. Return exactly one valid JSON object matching the schema below.
@@ -64,7 +88,7 @@ Output JSON Schema (flat SectionExtraction — no envelope, no nesting):
   "notes": "string"
 }}
 
-Worked Example (method section from a BO paper):
+Worked Example (method section — no result numbers yet):
 {{
   "research_question": "How can pre-training GP priors on multi-task data improve BO sample efficiency?",
   "methodology": "Pre-train GP mean (2-layer NN) and Matern52 kernel using KL divergence loss. Freeze prior for downstream BO using PI acquisition.",
@@ -81,5 +105,30 @@ Worked Example (method section from a BO paper):
   "evaluation_metrics": ["simple regret", "log regret", "NLL"],
   "reported_results": [],
   "notes": "Theoretical bounds on posterior mean convergence proven in this section."
+}}
+
+Worked Example (experiments section with table numbers):
+{{
+  "research_question": "",
+  "methodology": "",
+  "datasets_or_benchmarks": ["Cora", "Citeseer", "Townsend Function (2D)"],
+  "variables": ["hidden units", "pooling method"],
+  "hyperparameters": {{"hidden_units": "16", "optimizer": "Adam"}},
+  "evaluation_metrics": ["NMI", "ARI", "objective value"],
+  "reported_results": [
+    {{
+      "benchmark": "Cora",
+      "metric_name": "NMI",
+      "value": "0.72",
+      "source": "Table 3"
+    }},
+    {{
+      "benchmark": "Townsend Function (2D)",
+      "metric_name": "objective value",
+      "value": "2.6389E+02",
+      "source": "Table 1"
+    }}
+  ],
+  "notes": "Copied metric values from tables; did not leave table references without numbers."
 }}
 """.strip()

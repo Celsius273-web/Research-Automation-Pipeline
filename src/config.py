@@ -43,12 +43,20 @@ MODEL_NUM_PREDICT = int(os.getenv("MODEL_NUM_PREDICT", "1024"))
 # Each section can be tens of thousands of chars; 12000 gives ~3 pages of dense
 # academic text while staying well within typical context window budgets.
 ANALYST_SECTION_CHARS = int(os.getenv("ANALYST_SECTION_CHARS", "12000"))
+# Experiments/appendix often hold result tables past the first window; chunk them.
+ANALYST_RESULT_SECTION_CHARS = int(os.getenv("ANALYST_RESULT_SECTION_CHARS", "12000"))
+ANALYST_RESULT_CHUNK_OVERLAP = int(os.getenv("ANALYST_RESULT_CHUNK_OVERLAP", "800"))
+ANALYST_MAX_RESULT_CHUNKS = int(os.getenv("ANALYST_MAX_RESULT_CHUNKS", "4"))
+ANALYST_NUM_PREDICT = int(os.getenv("ANALYST_NUM_PREDICT", str(max(MODEL_NUM_PREDICT, 2048))))
+ANALYST_MAX_EXTRACTED_TABLES = int(os.getenv("ANALYST_MAX_EXTRACTED_TABLES", "20"))
 
 REVIEW_MATCH_TOLERANCE_PCT = float(os.getenv("REVIEW_MATCH_TOLERANCE_PCT", "5.0"))
 REVIEW_CLOSE_TOLERANCE_PCT = float(os.getenv("REVIEW_CLOSE_TOLERANCE_PCT", "20.0"))
 
 # Agent reasoning and retry configuration.
 PLANNER_MAX_RETRIES = int(os.getenv("PLANNER_MAX_RETRIES", "3"))
+PLANNER_DEFAULT_SETUP_MINUTES = float(os.getenv("PLANNER_DEFAULT_SETUP_MINUTES", "5"))
+PLANNER_MAX_EXAMPLE_COMMANDS = int(os.getenv("PLANNER_MAX_EXAMPLE_COMMANDS", "5"))
 
 # Engineer/Executor retry loop.
 MAX_RETRY_ATTEMPTS = int(os.getenv("MAX_RETRY_ATTEMPTS", "5"))

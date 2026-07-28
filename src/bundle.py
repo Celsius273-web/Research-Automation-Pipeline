@@ -7,7 +7,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from src.config import PAPER_BUNDLES_DIR
+from src.config import PAPER_BUNDLES_DIR, PLANNER_DEFAULT_SETUP_MINUTES
 from src.state import (
     AgentEnvelope,
     ExtractionBundle,
@@ -20,6 +20,12 @@ from src.state import (
     SectionExtraction,
 )
 from src.tools.language_detect import detect_language
+from src.tools.repo_context import (
+    extract_example_commands,
+    infer_build_command,
+    summarize_readme,
+    summarize_repo_tree,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -68,15 +74,26 @@ class PaperBundle:
 
     def get_repo_info(self) -> RepoContext:
         """Get repository context information."""
+        metadata = self.get_metadata() or {}
+        repo_url = str(metadata.get("repo_url") or "")
         if not self.has_code():
             return RepoContext(
+                repo_url=repo_url,
                 repo_path=str(self.code_dir),
                 language="unknown",
                 build_system="unknown",
+                has_code=False,
                 notes="No code repository available",
             )
-        
-        return detect_language(repo_path=str(self.code_dir))
+
+        detected = detect_language(repo_path=str(self.code_dir), repo_url=repo_url)
+        detected.has_code = True
+        detected.setup_time_minutes = PLANNER_DEFAULT_SETUP_MINUTES
+        detected.file_tree = summarize_repo_tree(self.code_dir)
+        detected.readme_summary = summarize_readme(self.code_dir)
+        detected.build_system = infer_build_command(self.code_dir, detected.build_system)
+        detected.example_commands = extract_example_commands(self.code_dir)
+        return detected
 
     def get_setup_guide(self) -> str:
         """Extract setup instructions from README files in the code directory."""

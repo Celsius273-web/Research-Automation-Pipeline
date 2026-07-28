@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from src.bundle import PaperBundle
+from src.agents.planner_debug import refresh_planner_debug_with_saved_plan
 from src.config import EXTRACTIONS_DIR, PLANS_DIR, REPORTS_DIR, RUNS_DIR
 from src.state import (
     AgentEnvelope,
@@ -89,6 +90,7 @@ def persist_plan(
     paper_bundle = PaperBundle(paper.paper_id)
     paper_bundle.create_bundle_dir()
     paper_bundle.save_plan(plan, ReviewRecord(status=plan_review.status, notes=plan_review.notes), paper, source_extraction_path)
+    refresh_planner_debug_with_saved_plan(paper_bundle.bundle_dir, paper_bundle.plan_path)
     return paper_bundle.plan_path
 
 

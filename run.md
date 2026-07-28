@@ -53,8 +53,13 @@ cd /Users/school/ResearchAssistant
 
 # Analyst + Planner together (auto-approve all checkpoints)
 .venv/bin/python -m src.main analyst --paper-id <paper_id> --with-plan --non-interactive
+
+
+for id in boundary_exploration_bo pretrained_gp_bo spectral_clustering_gnn stag_sparse; do
+  echo "=== ANALYST $id ==="
+  .venv/bin/python -m src.main analyst --paper-id "$id" --non-interactive
+done 
 ```
-"
 **Output files in `data/papers/<paper_id>/`:**
 
 | File | Contents |
@@ -111,3 +116,4 @@ Requires an **approved extraction artifact** (run Analyst first).
 |---|---|
 | `pre_trained_gaussian_processes_bayesian_optimization` | Pre-trained Gaussian Processes for Bayesian Optimization |
 | `p2p_replication` | P2P Search and Replication |
+
