@@ -24,12 +24,20 @@ def _is_present_text(value: str) -> bool:
 
 def infer_paper_type(analyst_output: PlannerAnalystOutput) -> str:
     """Classify the paper using deterministic language in the Analyst output."""
-    description = f"{analyst_output.methodology} {analyst_output.notes}".lower()
+    description = (
+        f"{analyst_output.methodology} {analyst_output.paper_overview} {analyst_output.notes}"
+    ).lower()
     toolkit_terms = ("library", "toolkit", "software package", "framework implementing")
     if any(term in description for term in toolkit_terms):
         return "toolkit"
 
-    empirical_terms = ("empirical study", "evaluate", "evaluation", "benchmark", "comparison")
+    # Prefer strong empirical cues; bare "evaluation"/"benchmark" appear in methods papers too.
+    empirical_terms = (
+        "empirical study",
+        "large-scale evaluation",
+        "benchmark comparison",
+        "comparative study",
+    )
     if analyst_output.datasets_or_benchmarks and any(term in description for term in empirical_terms):
         return "empirical"
     return "methods"
@@ -53,6 +61,7 @@ def _build_analyst_output(context: PlannerInputContext) -> PlannerAnalystOutput:
     extraction = context.approved_extraction
     return PlannerAnalystOutput(
         research_question=extraction.research_question,
+        paper_overview=extraction.paper_overview,
         methodology=extraction.methodology,
         datasets_or_benchmarks=extraction.datasets_or_benchmarks,
         variables=extraction.variables,

@@ -25,6 +25,7 @@ def test_boundary_example_validates_against_unified_contract() -> None:
     assert planner_input.flags.paper_type == "methods"
     assert "Townsend Function (2D)" in planner_input.analyst_output.datasets_or_benchmarks
     assert planner_input.analyst_output.hyperparameters["hidden_layers"] == [1, 2, 3, 4]
+    assert "unknown physical limits" in planner_input.analyst_output.paper_overview.lower()
 
 
 def test_build_unified_input_derives_flags_without_unknown_sentinels() -> None:

@@ -60,6 +60,7 @@ def run_cli_review(extraction: SectionExtraction) -> tuple[SectionExtraction, Re
     edited = extraction.model_copy(deep=True)
     fields = [
         "research_question",
+        "paper_overview",
         "methodology",
         "datasets_or_benchmarks",
         "variables",

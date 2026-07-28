@@ -99,6 +99,7 @@ class SectionExtraction(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     research_question: str = ""
+    paper_overview: str = ""
     methodology: str = ""
     datasets_or_benchmarks: list[str] = Field(default_factory=list)
     variables: list[str] = Field(default_factory=list)
@@ -124,6 +125,7 @@ class PlannerAnalystOutput(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     research_question: str
+    paper_overview: str = ""
     methodology: str
     datasets_or_benchmarks: list[str]
     variables: list[str]

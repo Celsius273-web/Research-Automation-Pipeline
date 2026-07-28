@@ -31,7 +31,7 @@ from src.state import (
 logger = logging.getLogger(__name__)
 
 _VALID_SECTION_FIELDS = frozenset({
-    "research_question", "methodology", "datasets_or_benchmarks",
+    "research_question", "paper_overview", "methodology", "datasets_or_benchmarks",
     "variables", "hyperparameters", "evaluation_metrics", "reported_results", "notes",
 })
 
@@ -41,6 +41,7 @@ _SECTION_EXTRACTION_JSON_SCHEMA: dict = {
     "type": "object",
     "properties": {
         "research_question": {"type": "string"},
+        "paper_overview": {"type": "string"},
         "methodology": {"type": "string"},
         "datasets_or_benchmarks": {"type": "array", "items": {"type": "string"}},
         "variables": {"type": "array", "items": {"type": "string"}},
@@ -62,16 +63,16 @@ _SECTION_EXTRACTION_JSON_SCHEMA: dict = {
         "notes": {"type": "string"},
     },
     "required": [
-        "research_question", "methodology", "datasets_or_benchmarks",
+        "research_question", "paper_overview", "methodology", "datasets_or_benchmarks",
         "variables", "hyperparameters", "evaluation_metrics",
         "reported_results", "notes",
     ],
 }
 
 _SCHEMA_REMINDER = (
-    '{"research_question":"","methodology":"","datasets_or_benchmarks":[],'
-    '"variables":[],"hyperparameters":{},"evaluation_metrics":[],'
-    '"reported_results":[],"notes":""}'
+    '{"research_question":"","paper_overview":"","methodology":"",'
+    '"datasets_or_benchmarks":[],"variables":[],"hyperparameters":{},'
+    '"evaluation_metrics":[],"reported_results":[],"notes":""}'
 )
 
 _RESULT_FOCUS_SECTIONS = frozenset({"experiments", "appendix"})
@@ -111,6 +112,27 @@ _JUNK_DATASET_MARKERS = (
     "corollary",
     "et al",
     "implementation details",
+)
+
+# Map alternate hyperparameter keys onto a canonical name (lowercase).
+_HPARAM_KEY_ALIASES: dict[str, str] = {
+    "neurons_per_layer_formula": "hidden_layer_size_formula",
+    "neuron_scaling_factor_c": "constant_factor_c_tested",
+    "constant_factor_c": "constant_factor_c_tested",
+    "optimizer_nll": "optimizer",
+    "learning_rate_nll": "learning_rate",
+    "gp_ucb_coefficient": "ucb_coefficient",
+    "ucb_coefficient_stboh": "ucb_coefficient",
+    "mean_network_architecture_h-nll": "mean_network_architecture",
+    "kernel_type_h-nll_fsbo": "kernel_type",
+    "deep ensembles": "deep_ensembles",
+    "acquisition function": "acquisition_function",
+    "constraint_handling_method": "constraint_handling",
+}
+
+_DATASET_DIM_SUFFIX_RE = re.compile(r"\s*\((\d+)\s*[dD]\)\s*$")
+_DATASET_VARIANT_RE = re.compile(
+    r"^(?P<dataset>.+?)\s+(?P<arch>[A-Za-z][\w+.-]*)\s+(?P<size>\d+)$"
 )
 
 
@@ -179,6 +201,124 @@ def _clean_datasets(values: list[str]) -> list[str]:
     return _dedupe_keep_order([item for item in values if not _is_junk_dataset(item)])
 
 
+def _normalize_dataset_key(name: str) -> str:
+    text = re.sub(r"\s+", " ", (name or "").strip().lower())
+    text = _DATASET_DIM_SUFFIX_RE.sub("", text).strip()
+    return text
+
+
+def _dataset_specificity(name: str) -> tuple[int, int]:
+    """Prefer dimensioned / longer names when collapsing duplicates."""
+    has_dim = 1 if _DATASET_DIM_SUFFIX_RE.search(name) else 0
+    return (has_dim, len(name))
+
+
+def _collapse_dataset_aliases(values: list[str]) -> list[str]:
+    """Keep one entry per base name; prefer the more specific spelling."""
+    best: dict[str, str] = {}
+    order: list[str] = []
+    for item in values:
+        key = _normalize_dataset_key(item)
+        if not key:
+            continue
+        if key not in best:
+            best[key] = item
+            order.append(key)
+            continue
+        if _dataset_specificity(item) > _dataset_specificity(best[key]):
+            best[key] = item
+    return [best[key] for key in order]
+
+
+def _matrix_collapse_dataset_variants(values: list[str]) -> list[str]:
+    """Collapse 'Dataset Arch Batch' triples into matrix notation when possible."""
+    groups: dict[str, dict[str, set[str] | list[str]]] = {}
+    leftovers: list[str] = []
+    group_order: list[str] = []
+
+    for item in values:
+        match = _DATASET_VARIANT_RE.match(item.strip())
+        if not match:
+            leftovers.append(item)
+            continue
+        dataset = match.group("dataset").strip()
+        arch = match.group("arch").strip()
+        size = match.group("size").strip()
+        key = dataset.lower()
+        if key not in groups:
+            groups[key] = {"dataset": dataset, "arches": set(), "sizes": set(), "raw": []}
+            group_order.append(key)
+        groups[key]["arches"].add(arch)  # type: ignore[union-attr]
+        groups[key]["sizes"].add(size)  # type: ignore[union-attr]
+        groups[key]["raw"].append(item)  # type: ignore[union-attr]
+
+    collapsed: list[str] = []
+    for key in group_order:
+        group = groups[key]
+        raw = list(group["raw"])  # type: ignore[arg-type]
+        arches = sorted(group["arches"])  # type: ignore[arg-type]
+        sizes = sorted(group["sizes"], key=lambda value: int(value))  # type: ignore[arg-type]
+        if len(raw) >= 2 and (len(arches) > 1 or len(sizes) > 1):
+            dataset = str(group["dataset"])
+            collapsed.append(
+                f"{dataset} × {{{', '.join(arches)}}} × batch {{{', '.join(sizes)}}}"
+            )
+        else:
+            collapsed.extend(raw)
+    return _dedupe_keep_order(collapsed + leftovers)
+
+
+def _organize_datasets(values: list[str]) -> list[str]:
+    cleaned = _clean_datasets(values)
+    collapsed = _collapse_dataset_aliases(cleaned)
+    return _matrix_collapse_dataset_variants(collapsed)
+
+
+def _normalize_hparam_key(key: str) -> str:
+    text = re.sub(r"[\s/]+", "_", (key or "").strip().lower())
+    text = re.sub(r"_+", "_", text).strip("_")
+    return _HPARAM_KEY_ALIASES.get(text, text)
+
+
+def _values_equivalent(left: str, right: str) -> bool:
+    def _norm(value: str) -> str:
+        text = re.sub(r"\s+", " ", (value or "").strip().lower())
+        text = text.replace("$", "").replace("\\times", "x").replace("×", "x")
+        return text
+
+    return _norm(left) == _norm(right)
+
+
+def _merge_hyperparameter_aliases(params: dict[str, str]) -> dict[str, str]:
+    """Collapse alias keys onto canonical names when values agree or only one exists."""
+    merged: dict[str, str] = {}
+    for raw_key, raw_value in params.items():
+        value = str(raw_value).strip()
+        if not value:
+            continue
+        key = _normalize_hparam_key(raw_key)
+        if key not in merged:
+            merged[key] = value
+            continue
+        if _values_equivalent(merged[key], value):
+            # Prefer the longer/more specific wording when equal after normalize.
+            if len(value) > len(merged[key]):
+                merged[key] = value
+            continue
+        # Conflicting values: keep the original distinct key spelling.
+        conflict_key = re.sub(r"[\s/]+", "_", raw_key.strip().lower())
+        if conflict_key not in merged:
+            merged[conflict_key] = value
+    return merged
+
+
+def _pick_preferred_text(*candidates: str) -> str:
+    for value in candidates:
+        if _is_present_text(value):
+            return value.strip()
+    return ""
+
+
 def _has_numeric_value(value: str) -> bool:
     """True when value contains a digit suitable for reproduction comparison."""
     text = (value or "").strip()
@@ -242,6 +382,8 @@ def merge_chunk_extractions(chunks: list[SectionExtraction]) -> SectionExtractio
     for chunk in chunks:
         if not merged.research_question and chunk.research_question:
             merged.research_question = chunk.research_question
+        if not merged.paper_overview and chunk.paper_overview:
+            merged.paper_overview = chunk.paper_overview
         if not merged.methodology and chunk.methodology:
             merged.methodology = chunk.methodology
         merged.datasets_or_benchmarks = _dedupe_keep_order(
@@ -272,12 +414,21 @@ def merge_section_extractions(
 ) -> SectionExtraction:
     merged = SectionExtraction()
     merged_reported: dict[tuple[str, str], ReportedResult] = {}
+
+    abstract = extractions.get("abstract")
+    if abstract and _is_present_text(abstract.research_question):
+        merged.research_question = abstract.research_question.strip()
+
+    overview_candidates = [
+        (extractions.get(name).paper_overview if extractions.get(name) else "")
+        for name in ("abstract", "method", "experiments", "hyperparameters", "appendix")
+    ]
+    merged.paper_overview = _pick_preferred_text(*overview_candidates)
+
     for section in SECTION_NAMES:
         ext = extractions.get(section)
         if not ext:
             continue
-        if not merged.research_question and ext.research_question:
-            merged.research_question = ext.research_question
         if not merged.methodology and ext.methodology:
             merged.methodology = ext.methodology
 
@@ -306,20 +457,25 @@ def soft_fill_research_question(
     extraction: SectionExtraction,
     paper_title: str = "",
 ) -> SectionExtraction:
-    """Fill empty RQ from toolkit/methodology/title and mark the inference in notes."""
+    """Fill empty RQ from toolkit/overview/methodology/title and mark inference in notes."""
     if _is_present_text(extraction.research_question):
         return extraction
 
     methodology = (extraction.methodology or "").strip()
+    overview = (extraction.paper_overview or "").strip()
     title = (paper_title or "").strip()
     notes = extraction.notes or ""
 
-    if _looks_like_toolkit(methodology, notes):
-        purpose = methodology or title or "an open-source research toolkit"
+    if _looks_like_toolkit(methodology, notes) or _looks_like_toolkit(overview, notes):
+        purpose = methodology or overview or title or "an open-source research toolkit"
         filled = f"Toolkit paper: {purpose}"
         inference_note = (
             "[inferred] research_question: toolkit paper purpose synthesized from methodology/title"
         )
+    elif overview:
+        first = re.split(r"(?<=[.!?])\s+", overview, maxsplit=1)[0].strip()
+        filled = first if first.endswith("?") else f"How can we address: {first}"
+        inference_note = "[inferred] research_question synthesized from paper_overview"
     elif methodology:
         filled = f"How can we implement and evaluate the following method: {methodology}"
         inference_note = "[inferred] research_question synthesized from methodology"
@@ -348,7 +504,9 @@ def finalize_merged_extraction(
     """Deterministic cleanup + soft-fill after section merge."""
     cleaned = extraction.model_copy(
         update={
-            "datasets_or_benchmarks": _clean_datasets(extraction.datasets_or_benchmarks),
+            "paper_overview": (extraction.paper_overview or "").strip(),
+            "datasets_or_benchmarks": _organize_datasets(extraction.datasets_or_benchmarks),
+            "hyperparameters": _merge_hyperparameter_aliases(dict(extraction.hyperparameters)),
             "reported_results": _clean_reported_results(extraction.reported_results),
         }
     )

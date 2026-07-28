@@ -138,6 +138,7 @@ def test_merge_notes_are_concatenated_across_sections() -> None:
 def _flat_payload() -> dict:
     return {
         "research_question": "How does X affect Y?",
+        "paper_overview": "X is studied because Y matters in practice. This paper proposes a method to relate them under limited budgets.",
         "methodology": "GP surrogate with EI acquisition",
         "datasets_or_benchmarks": ["BBOB"],
         "variables": ["acquisition temperature", "lengthscale"],
@@ -334,6 +335,55 @@ def test_soft_fill_methodology_research_question() -> None:
     assert "BE-CBO" in filled.research_question
     assert filled.research_question.startswith("How can we implement")
     assert "[inferred] research_question synthesized from methodology" in filled.notes
+
+
+def test_soft_fill_prefers_paper_overview_over_methodology() -> None:
+    from src.agents.analyst import soft_fill_research_question
+
+    filled = soft_fill_research_question(
+        SectionExtraction(
+            paper_overview="Boundary constraints dominate many physical design tasks. BE-CBO explores that frontier.",
+            methodology="Long methodology dump that should not become the RQ.",
+        )
+    )
+    assert "Boundary constraints dominate" in filled.research_question
+    assert "Long methodology dump" not in filled.research_question
+    assert "[inferred] research_question synthesized from paper_overview" in filled.notes
+
+
+def test_finalize_organizes_datasets_and_hparams() -> None:
+    from src.agents.analyst import finalize_merged_extraction
+
+    cleaned = finalize_merged_extraction(
+        SectionExtraction(
+            research_question="RQ",
+            paper_overview="A. B. C. D.",
+            methodology="Method",
+            datasets_or_benchmarks=[
+                "MNIST CNNPoolTanh 2048",
+                "MNIST CNNPoolTanh 256",
+                "MNIST CNNPoolReLU 2048",
+                "Gas Transmission Compressor Design",
+                "Gas Transmission Compressor Design (4D)",
+                "synthetic",
+            ],
+            hyperparameters={
+                "learning_rate": "1e-3",
+                "learning_rate_NLL": "1e-3",
+                "neurons_per_layer_formula": "64 * log2(d)",
+                "hidden_layer_size_formula": "64 * log2(d)",
+                "optimizer": "Adam",
+            },
+        )
+    )
+    assert any("MNIST ×" in item and "CNNPoolTanh" in item for item in cleaned.datasets_or_benchmarks)
+    assert "Gas Transmission Compressor Design (4D)" in cleaned.datasets_or_benchmarks
+    assert "Gas Transmission Compressor Design" not in cleaned.datasets_or_benchmarks
+    assert "synthetic" not in cleaned.datasets_or_benchmarks
+    assert "learning_rate" in cleaned.hyperparameters
+    assert "learning_rate_nll" not in cleaned.hyperparameters
+    assert "hidden_layer_size_formula" in cleaned.hyperparameters
+    assert "neurons_per_layer_formula" not in cleaned.hyperparameters
 
 
 def test_finalize_drops_junk_datasets_and_empty_results() -> None:

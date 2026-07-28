@@ -41,7 +41,7 @@ def test_prompt_input_raises_on_eof() -> None:
 
 def test_run_cli_review_allows_skipping_optional_notes() -> None:
     extraction = SectionExtraction(research_question="What is X?")
-    approvals = [""] * 7 + ["", ""]
+    approvals = [""] * 8 + ["", ""]
     with patch("builtins.input", side_effect=approvals):
         approved, review = run_cli_review(extraction)
     assert approved.research_question == "What is X?"
@@ -51,7 +51,7 @@ def test_run_cli_review_allows_skipping_optional_notes() -> None:
 
 def test_run_cli_review_quits_from_optional_notes() -> None:
     extraction = SectionExtraction(research_question="What is X?")
-    approvals = [""] * 7 + ["", "q"]
+    approvals = [""] * 8 + ["", "q"]
     with patch("builtins.input", side_effect=approvals):
         with pytest.raises(ReviewCancelledError):
             run_cli_review(extraction)

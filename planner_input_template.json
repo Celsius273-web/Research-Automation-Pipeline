@@ -1,0 +1,43 @@
+{
+  "analyst_output": {
+    "research_question": "string",
+    "paper_overview": "string (4-6 sentences: goals, aim, background from abstract/intro)",
+    "methodology": "string",
+    "datasets_or_benchmarks": ["string"],
+    "variables": ["string"],
+    "hyperparameters": {
+      "key": "value (string, number, or array)"
+    },
+    "evaluation_metrics": ["string"],
+    "reported_results": [
+      {
+        "benchmark": "string",
+        "metric_name": "string",
+        "value": "string",
+        "source": "string (e.g., 'Table 3', 'Figure 5', 'abstract')"
+      }
+    ],
+    "notes": "string"
+  },
+  "repo_context": {
+    "url": "string (GitHub or similar)",
+    "language": "string (Python, C++, etc.)",
+    "build_system": "string (e.g., 'pip install -r requirements.txt')",
+    "has_code": "boolean (true if repo contains runnable code)",
+    "setup_time_minutes": "number (estimated)",
+    "file_tree": "string (one-line summary of main directories)",
+    "readme_summary": "string (first 2-3 sentences of README, or 'No README')"
+  },
+  "paper_context": {
+    "paper_id": "string (unique identifier for this paper)",
+    "title": "string",
+    "arxiv_id": "string or null",
+    "pdf_path": "string (local path if available)"
+  },
+  "flags": {
+    "has_research_question": "boolean (true if analyst_output.research_question is non-empty)",
+    "has_code_repo": "boolean (true if repo_context.has_code is true)",
+    "has_datasets": "boolean (true if analyst_output.datasets_or_benchmarks is non-empty)",
+    "paper_type": "string (exactly one of: 'methods', 'empirical', 'toolkit')"
+  }
+}

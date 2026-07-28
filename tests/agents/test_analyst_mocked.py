@@ -49,6 +49,7 @@ def test_analyst_parses_flat_section_extraction(monkeypatch) -> None:
     analyst = PaperAnalyst(max_parse_retries=0)
     flat_payload = {
         "research_question": "How does X affect Y?",
+        "paper_overview": "Background on X and Y. The paper studies their relationship under limited budgets.",
         "methodology": "Experimental study with a GP surrogate",
         "datasets_or_benchmarks": ["BBOB"],
         "variables": ["acquisition temperature"],

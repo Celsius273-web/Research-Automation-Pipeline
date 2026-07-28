@@ -71,6 +71,7 @@ def _extraction_to_analyst_dict(extraction: SectionExtraction) -> dict[str, obje
     """Serialize SectionExtraction into the analyst_output shape sent to the LLM."""
     return {
         "research_question": extraction.research_question,
+        "paper_overview": extraction.paper_overview,
         "methodology": extraction.methodology,
         "datasets_or_benchmarks": extraction.datasets_or_benchmarks,
         "variables": extraction.variables,
