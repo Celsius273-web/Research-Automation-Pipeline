@@ -9,9 +9,7 @@ from src.state import (
     AnalystPayloadCore,
     AnalystPayloadExtensions,
     PlannerPayload,
-    PlannerPayloadCore,
-    PlannerPayloadExtensions,
-    PlanStepCore,
+    PlanStep,
     EngineerPayload,
     EngineerPayloadCore,
     EngineerPayloadExtensions,
@@ -35,7 +33,9 @@ def test_make_initial_state_contains_phase_placeholders() -> None:
 
     assert state["paper"].paper_id == "sample_paper"
     assert state["review"].status == "pending"
-    assert state["planner_output"].schema_version == "1.0"
+    assert state["planner_output"].schema_version == "2.0"
+    assert state["planner_output"].agent == "planner"
+    assert state["planner_output"].payload.plan_summary == ""
     assert state["planner_output_json"] == {}
     assert state["plan_review"].status == "pending"
     assert state["engineer_output"].step_id == ""
@@ -108,32 +108,42 @@ def test_agent_envelope_analyst_partial_with_unknowns() -> None:
     assert envelope.unknowns[0].severity == "medium"
 
 
-def test_agent_envelope_planner_compact_steps() -> None:
-    """Test planner payload with compact core steps."""
+def test_agent_envelope_planner_flat_payload() -> None:
+    """Test planner payload with phase DAG fields."""
+    from src.state import PlanPhase, PhaseRunSpec
+
     payload = PlannerPayload(
-        core=PlannerPayloadCore(
-            plan_summary="Execute benchmark experiments",
-            domain="bayesian_optimization",
-            objective="Reproduce paper results",
-            steps=[
-                PlanStepCore(
-                    step_id="step_1",
-                    title="Run baseline",
-                    goal="Execute baseline experiment",
-                    run_command="python run.py --config baseline",
-                    depends_on=[],
-                    results_path="outputs/baseline.json",
-                )
-            ],
-        ),
-        extensions=PlannerPayloadExtensions(
-            assumptions=["CPU-only execution"],
-            constraints=["No external APIs"],
-            missing_context=[],
-            experiment_matrix=[],
-            verification_checks=["Exit code 0"],
-            risks=["May timeout"],
-        ),
+        plan_summary="Execute benchmark experiments",
+        domain="bayesian_optimization",
+        objective="Reproduce paper results",
+        phases=[
+            PlanPhase(
+                phase_id="step_1",
+                title="Run baseline",
+                goal="Execute baseline experiment",
+                run_template="python run.py --config baseline",
+                matrix=[
+                    PhaseRunSpec(
+                        name="baseline",
+                        run_command="python run.py --config baseline",
+                        code_refs=["run.py"],
+                        verify=["exists:results/sample/summary.json"],
+                        results_path="results/sample/summary.json",
+                    )
+                ],
+                results_path="results/sample/summary.json",
+            )
+        ],
+        assumptions=["CPU-only execution"],
+        constraints=["No external APIs"],
+        missing_context=[],
+        verification_checks=["Exit code 0"],
+        risks=["May timeout"],
+        organization=["Setup then matrix"],
+        execution=["Reuse run.py"],
+        repo_usage=["pip install -r requirements.txt"],
+        engineer_notes=["Pin torch versions"],
+        results_summary_path="results/sample/summary.json",
     )
     envelope = AgentEnvelope[PlannerPayload](
         schema_version="2.0",
@@ -143,9 +153,10 @@ def test_agent_envelope_planner_compact_steps() -> None:
         warnings=[],
         payload=payload,
     )
-    assert len(envelope.payload.core.steps) == 1
-    assert envelope.payload.core.steps[0].step_id == "step_1"
-    assert envelope.payload.core.steps[0].run_command == "python run.py --config baseline"
+    assert len(envelope.payload.phases) == 1
+    assert envelope.payload.phases[0].phase_id == "step_1"
+    assert envelope.payload.phases[0].matrix[0].run_command == "python run.py --config baseline"
+    assert envelope.payload.results_summary_path == "results/sample/summary.json"
 
 
 def test_agent_envelope_engineer_with_patches() -> None:

@@ -6,25 +6,38 @@ from pathlib import Path
 import src.main as main_module
 import src.persistence as persistence_module
 from src.bundle import PaperBundle
-from src.config import PAPER_BUNDLES_DIR
 from src.state import (
     AgentEnvelope,
-    ExecutionPlan,
     PaperMetadata,
     PlannerPayload,
     PlanReviewRecord,
+    PlanPhase,
     ReviewRecord,
     SectionExtraction,
 )
 
 
+def _sample_envelope() -> AgentEnvelope[PlannerPayload]:
+    return AgentEnvelope[PlannerPayload](
+        schema_version="2.0",
+        agent="planner",
+        status="ok",
+        unknowns=[],
+        warnings=[],
+        payload=PlannerPayload(
+            plan_summary="Test plan",
+            domain="optimization",
+            objective="Reproduce results",
+            phases=[PlanPhase(phase_id="s1", title="Step one")],
+            results_summary_path="results/p1/summary.json",
+        ),
+    )
+
+
 def test_persist_plan_writes_expected_artifact(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(persistence_module, "PLANS_DIR", tmp_path / "plans")
     paper = PaperMetadata(paper_id="p1", title="Paper 1", pdf_path="paper.pdf")
-    plan = ExecutionPlan(
-        plan_summary="Test plan",
-        steps=[{"step_id": "s1", "title": "Step one"}],
-    )
+    plan = _sample_envelope()
     review = PlanReviewRecord(status="approved", notes="looks good")
 
     saved = persistence_module.persist_plan(
@@ -36,21 +49,18 @@ def test_persist_plan_writes_expected_artifact(tmp_path, monkeypatch) -> None:
     payload = json.loads(saved.read_text(encoding="utf-8"))
     assert payload["paper"]["paper_id"] == "p1"
     assert payload["plan_review"]["status"] == "approved"
-    assert payload["execution_plan"]["steps"][0]["step_id"] == "s1"
+    assert payload["plan_envelope"]["payload"]["phases"][0]["phase_id"] == "s1"
 
 
 def test_run_plan_with_paper_id_uses_extraction_artifact(tmp_path, monkeypatch) -> None:
-    # Set up bundle directory structure
     bundles_dir = tmp_path / "papers"
     bundles_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setattr("src.config.PAPER_BUNDLES_DIR", bundles_dir)
     monkeypatch.setattr("src.bundle.PAPER_BUNDLES_DIR", bundles_dir)
-    
-    # Create paper bundle with extraction
+
     bundle = PaperBundle("paper_x")
     bundle.create_bundle_dir()
-    
-    # Create extraction in bundle format
+
     extraction_payload = {
         "paper": {"paper_id": "paper_x", "title": "Paper X", "pdf_path": "paper_x.pdf"},
         "review": ReviewRecord(status="approved", notes="ok").model_dump(),
@@ -66,9 +76,16 @@ def test_run_plan_with_paper_id_uses_extraction_artifact(tmp_path, monkeypatch) 
         assert non_interactive is True
 
         def planner_node(state):
-            state["planner_output"] = ExecutionPlan(
-                plan_summary="Planner output",
-                steps=[{"step_id": "s1", "title": "Run"}],
+            state["planner_output"] = AgentEnvelope[PlannerPayload](
+                schema_version="2.0",
+                agent="planner",
+                status="ok",
+                unknowns=[],
+                warnings=[],
+                payload=PlannerPayload(
+                    plan_summary="Planner output",
+                    phases=[PlanPhase(phase_id="s1", title="Run")],
+                ),
             )
             state["planner_output_json"] = state["planner_output"].model_dump()
             state["plan_review"] = PlanReviewRecord(status="approved", notes="auto")
@@ -79,7 +96,6 @@ def test_run_plan_with_paper_id_uses_extraction_artifact(tmp_path, monkeypatch) 
     monkeypatch.setattr(main_module, "make_planner_node", fake_make_planner_node)
     code = main_module.run_plan(extraction_path=None, paper_id="paper_x", non_interactive=True)
     assert code == 0
-    # Check that plan was saved to bundle
     assert bundle.plan_path.exists()
 
 
@@ -101,22 +117,43 @@ def test_run_plan_accepts_unified_input_json(tmp_path, monkeypatch) -> None:
                     "unknowns": [],
                     "warnings": [],
                     "payload": {
-                        "core": {
-                            "plan_summary": "Run BE-CBO on Townsend using the official repository.",
-                            "domain": "bayesian_optimization",
-                            "objective": "Evaluate BE-CBO at unknown feasibility boundaries.",
-                            "steps": [
-                                {
-                                    "step_id": "run_townsend",
-                                    "title": "Run Townsend",
-                                    "goal": "Evaluate BE-CBO on Townsend Function (2D).",
-                                    "run_command": "python exp/run_exp.py --fun townsend --algo becbo",
-                                    "depends_on": [],
-                                    "results_path": "results/townsend.json",
-                                }
-                            ],
-                        },
-                        "extensions": {},
+                        "plan_summary": "Run BE-CBO on Townsend using the official repository.",
+                        "domain": "bayesian_optimization",
+                        "objective": "Evaluate BE-CBO at unknown feasibility boundaries.",
+                        "phases": [
+                            {
+                                "phase_id": "run_townsend",
+                                "title": "Run Townsend",
+                                "goal": "Evaluate BE-CBO on Townsend Function (2D).",
+                                "depends_on": [],
+                                "variables": ["benchmark", "algorithm"],
+                                "axes": {
+                                    "benchmark": ["tow"],
+                                    "algorithm": ["be-cbo"],
+                                },
+                                "run_template": "python exp/run_exp.py --fun FUN_NAME --algo ALGO_NAME",
+                                "matrix": [
+                                    {
+                                        "name": "tow__be-cbo",
+                                        "variables": {
+                                            "benchmark": "tow",
+                                            "algorithm": "be-cbo",
+                                        },
+                                        "run_command": (
+                                            "python exp/run_exp.py --fun tow --algo be-cbo"
+                                        ),
+                                        "code_refs": ["exp/run_exp.py"],
+                                        "verify": [
+                                            "exists:results/boundary_exploration_bo/summary.json"
+                                        ],
+                                        "results_path": "results/boundary_exploration_bo/summary.json",
+                                    }
+                                ],
+                                "planned_actions": "Run Townsend smoke with be-cbo.",
+                                "results_path": "results/boundary_exploration_bo/summary.json",
+                            }
+                        ],
+                        "results_summary_path": "results/boundary_exploration_bo/summary.json",
                     },
                 }
             )
@@ -136,4 +173,4 @@ def test_run_plan_accepts_unified_input_json(tmp_path, monkeypatch) -> None:
     assert code == 0
     saved = PaperBundle("boundary_exploration_bo").plan_path
     payload = json.loads(saved.read_text(encoding="utf-8"))
-    assert "BE-CBO" in payload["plan_envelope"]["payload"]["core"]["plan_summary"]
+    assert "BE-CBO" in payload["plan_envelope"]["payload"]["plan_summary"]

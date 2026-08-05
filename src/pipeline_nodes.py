@@ -15,14 +15,12 @@ from src.state import (
     EngineerInputContext,
     EngineerOutput,
     EngineerReviewRecord,
-    ExecutionPlan,
     ExecutorResult,
     FailureContext,
     PlannerInputContext,
     PlannerPayload,
     PlanReviewRecord,
     PlanStep,
-    PlanStepCore,
     ReportedResult,
     ResearchState,
     ReviewRecord,
@@ -136,10 +134,7 @@ def make_reviewer_node(reported_results: list[ReportedResult]):
             "build_system": state["repo_context"].build_system,
         }
         
-        if isinstance(execution_plan, ExecutionPlan):
-            domain = execution_plan.domain
-        else:
-            domain = execution_plan.payload.core.domain
+        domain = execution_plan.payload.domain
             
         try:
             report = reviewer.generate_report(
@@ -172,7 +167,7 @@ def _build_failure_context(state: ResearchState) -> FailureContext | None:
 
 
 def make_engineer_executor_nodes(
-    execution_plan: ExecutionPlan | AgentEnvelope[PlannerPayload],
+    execution_plan: AgentEnvelope[PlannerPayload],
     runtime_constraints: dict[str, str],
     non_interactive: bool,
 ):
@@ -181,13 +176,11 @@ def make_engineer_executor_nodes(
     executor = ExecutorAgent(project_root=ROOT_DIR, runs_dir=RUNS_DIR, docker_executor=docker_executor)
 
     def engineer_node(state: ResearchState) -> ResearchState:
-        if isinstance(execution_plan, ExecutionPlan):
-            steps = execution_plan.steps
-        else:
-            steps = execution_plan.payload.core.steps
-            
+        from src.state import project_phases_to_steps
+
+        steps = project_phases_to_steps(execution_plan.payload)
         if not steps:
-            state["errors"].append("Execution plan has no steps to run.")
+            state["errors"].append("Execution plan has no phases/steps to run.")
             return state
         step = steps[0]
         context = EngineerInputContext(
@@ -225,18 +218,17 @@ def make_engineer_executor_nodes(
             state["executor_result"].final_status = "failed"
             return state
 
+        from src.state import project_phases_to_steps
+
         output = state["engineer_output"]
-        if isinstance(execution_plan, ExecutionPlan):
-            step = execution_plan.steps[0]
-            commands = step.verification or output.verification_commands
-            results_path = step.results_path
-            step_id = step.step_id
-        else:
-            step = execution_plan.payload.core.steps[0]
-            # Convert run_command string to a list, or use engineer's verification commands
-            commands = [step.run_command] if step.run_command else output.verification_commands
-            results_path = step.results_path
-            step_id = step.step_id
+        projected = project_phases_to_steps(execution_plan.payload)
+        step = projected[0] if projected else None
+        if step is None:
+            state["errors"].append("Execution plan has no phases/steps to run.")
+            return state
+        commands = [step.run_command] if step.run_command else output.verification_commands
+        results_path = step.results_path
+        step_id = step.step_id
 
         if not commands:
             state["errors"].append("No verification commands available for executor.")

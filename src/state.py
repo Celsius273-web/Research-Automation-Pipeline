@@ -148,6 +148,7 @@ class PlannerRepoContext(BaseModel):
     file_tree: str
     readme_summary: str
     example_commands: list[str] = Field(default_factory=list)
+    entrypoint_hints: list[str] = Field(default_factory=list)
 
 
 class PlannerFlags(BaseModel):
@@ -185,93 +186,119 @@ class PlannerInputContext(BaseModel):
     paper_bundle_path: str | None = None
 
 
-class PlanStepCore(BaseModel):
-    """Core required fields for a plan step."""
+class PlanStep(BaseModel):
+    """One coarse execution unit projected for the Engineer/Executor loop."""
+
+    model_config = ConfigDict(extra="forbid")
+
     step_id: str
     title: str
-    goal: str
+    goal: str = ""
     run_command: str = ""
     depends_on: list[str] = Field(default_factory=list)
     results_path: str = ""
 
 
-class PlanStepExtensions(BaseModel):
-    """Optional enrichment fields for a plan step."""
-    actions: list[str] = Field(default_factory=list)
-    inputs: list[str] = Field(default_factory=list)
-    outputs: list[str] = Field(default_factory=list)
-    verification: list[str] = Field(default_factory=list)
-    failure_modes: list[str] = Field(default_factory=list)
+class PhaseRunSpec(BaseModel):
+    """One concrete (or example) run inside a phase matrix."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    variables: dict[str, str | int | float | bool] = Field(default_factory=dict)
+    run_command: str = ""
+    code_refs: list[str] = Field(default_factory=list)
+    verify: list[str] = Field(default_factory=list)
+    results_path: str = ""
+    metrics: list[str] = Field(default_factory=list)
+    source: str = ""
 
 
-class PlanStepComplete(BaseModel):
-    """Complete plan step with core and extensions."""
-    core: PlanStepCore
-    extensions: PlanStepExtensions = Field(default_factory=PlanStepExtensions)
+class PlanPhase(BaseModel):
+    """One experimental group in the Planner DAG."""
 
+    model_config = ConfigDict(extra="forbid")
 
-class PlannerPayloadCore(BaseModel):
-    """Required fields for planner output."""
-    plan_summary: str
-    domain: str
-    objective: str
-    steps: list[PlanStepCore] = Field(default_factory=list)
-
-
-class PlannerPayloadExtensions(BaseModel):
-    """Optional enrichment fields for planner output."""
-    assumptions: list[str] = Field(default_factory=list)
-    constraints: list[str] = Field(default_factory=list)
-    missing_context: list[str] = Field(default_factory=list)
-    experiment_matrix: list["ExperimentSpec"] = Field(default_factory=list)
-    verification_checks: list[str] = Field(default_factory=list)
-    risks: list[str] = Field(default_factory=list)
-
-
-class PlannerPayload(BaseModel):
-    """Complete planner payload with core and extensions."""
-    core: PlannerPayloadCore
-    extensions: PlannerPayloadExtensions = Field(default_factory=PlannerPayloadExtensions)
-
-
-class PlanStep(BaseModel):
-    """Legacy model for backward compatibility during migration."""
-    step_id: str
+    phase_id: str
     title: str
     goal: str = ""
-    actions: list[str] = Field(default_factory=list)
-    inputs: list[str] = Field(default_factory=list)
-    outputs: list[str] = Field(default_factory=list)
-    verification: list[str] = Field(default_factory=list)
-    results_path: str = ""
     depends_on: list[str] = Field(default_factory=list)
-    failure_modes: list[str] = Field(default_factory=list)
+    variables: list[str] = Field(default_factory=list)
+    axes: dict[str, list[str | int | float | bool]] = Field(default_factory=dict)
+    run_template: str = ""
+    matrix: list[PhaseRunSpec] = Field(default_factory=list)
+    planned_actions: str = ""
+    results_path: str = ""
 
 
 class ExperimentSpec(BaseModel):
+    """Flattened run row for results summary / legacy consumers."""
+
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     target: str = ""
+    benchmarks: list[str] = Field(default_factory=list)
     variables: list[str] = Field(default_factory=list)
     hyperparameters: dict[str, str | int | float | bool] = Field(default_factory=dict)
     metrics: list[str] = Field(default_factory=list)
     source_section: str = ""
-    implementation_steps: list[str] = Field(default_factory=list)
-    execution_pattern: str = ""
+    run_command: str = ""
+    code_refs: list[str] = Field(default_factory=list)
+    verify: list[str] = Field(default_factory=list)
     expected_runtime_minutes: int | None = None
 
 
-class ExecutionPlan(BaseModel):
-    schema_version: str = "1.0"
+class PlannerPayload(BaseModel):
+    """Engineer-facing planner body: phase DAG with compact per-phase matrices."""
+
+    model_config = ConfigDict(extra="forbid")
+
     plan_summary: str = ""
     domain: str = ""
     objective: str = ""
+    phases: list[PlanPhase] = Field(default_factory=list)
     assumptions: list[str] = Field(default_factory=list)
     constraints: list[str] = Field(default_factory=list)
     missing_context: list[str] = Field(default_factory=list)
-    steps: list[PlanStep] = Field(default_factory=list)
-    experiment_matrix: list[ExperimentSpec] = Field(default_factory=list)
     verification_checks: list[str] = Field(default_factory=list)
     risks: list[str] = Field(default_factory=list)
+    organization: list[str] = Field(default_factory=list)
+    execution: list[str] = Field(default_factory=list)
+    repo_usage: list[str] = Field(default_factory=list)
+    engineer_notes: list[str] = Field(default_factory=list)
+    results_summary_path: str = ""
+
+
+class PlannerEnvelope(AgentEnvelope[PlannerPayload]):
+    """Strict output contract enforced during Planner generation."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal["2.0"]
+    agent: Literal["planner"]
+    status: Literal["ok", "partial", "blocked"]
+    payload: PlannerPayload
+
+
+class ResultsAggregate(BaseModel):
+    """One benchmark-metric aggregate row in summary.json."""
+
+    benchmark: str
+    metric_name: str
+    mean: float | None = None
+    std: float | None = None
+    source_file_path: str = ""
+    n_runs: int = 0
+
+
+class ExperimentResultsSummary(BaseModel):
+    """Lightweight Executor <-> Reviewer contract for one paper."""
+
+    paper_id: str
+    experiment_matrix: list[ExperimentSpec] = Field(default_factory=list)
+    aggregates: list[ResultsAggregate] = Field(default_factory=list)
+    paper_reported_results: list["ReportedResult"] = Field(default_factory=list)
 
 
 class PlanReviewRecord(BaseModel):
@@ -290,6 +317,7 @@ class RepoContext(BaseModel):
     file_tree: str = ""
     readme_summary: str = ""
     example_commands: list[str] = Field(default_factory=list)
+    entrypoint_hints: list[str] = Field(default_factory=list)
     notes: str = ""
 
 
@@ -309,8 +337,8 @@ class FailureContext(BaseModel):
 
 class EngineerInputContext(BaseModel):
     paper: PaperMetadata
-    execution_plan: ExecutionPlan | AgentEnvelope[PlannerPayload]
-    plan_step: PlanStep | PlanStepCore
+    execution_plan: AgentEnvelope[PlannerPayload]
+    plan_step: PlanStep
     repo_context: RepoContext
     runtime_constraints: dict[str, str] = Field(default_factory=dict)
     failure_context: FailureContext | None = None
@@ -450,7 +478,7 @@ class ResearchState(TypedDict, total=False):
     extraction: ExtractionBundle
     review: ReviewRecord
     approved_extraction: SectionExtraction
-    planner_output: ExecutionPlan | AgentEnvelope[PlannerPayload]
+    planner_output: AgentEnvelope[PlannerPayload]
     planner_output_json: dict[str, Any]
     plan_review: PlanReviewRecord
     repo_context: RepoContext
@@ -462,6 +490,77 @@ class ResearchState(TypedDict, total=False):
     errors: list[str]
 
 
+def empty_planner_envelope() -> AgentEnvelope[PlannerPayload]:
+    """Baseline empty planner envelope for graph state initialization."""
+    return AgentEnvelope[PlannerPayload](
+        schema_version="2.0",
+        agent="planner",
+        status="ok",
+        unknowns=[],
+        warnings=[],
+        payload=PlannerPayload(),
+    )
+
+
+def project_phases_to_steps(payload: PlannerPayload) -> list[PlanStep]:
+    """Project the phase DAG into coarse PlanSteps for the Engineer/Executor loop."""
+    steps: list[PlanStep] = []
+    for phase in payload.phases:
+        if phase.matrix:
+            first = phase.matrix[0]
+            steps.append(
+                PlanStep(
+                    step_id=phase.phase_id,
+                    title=phase.title,
+                    goal=phase.goal or phase.planned_actions,
+                    run_command=first.run_command or phase.run_template,
+                    depends_on=list(phase.depends_on),
+                    results_path=first.results_path or phase.results_path,
+                )
+            )
+            continue
+        if phase.run_template or phase.phase_id == "setup":
+            steps.append(
+                PlanStep(
+                    step_id=phase.phase_id,
+                    title=phase.title,
+                    goal=phase.goal or phase.planned_actions,
+                    run_command=phase.run_template,
+                    depends_on=list(phase.depends_on),
+                    results_path=phase.results_path,
+                )
+            )
+    return steps
+
+
+def flatten_phases_to_experiment_specs(payload: PlannerPayload) -> list[ExperimentSpec]:
+    """Flatten example/smoke matrix rows for results-summary consumers."""
+    rows: list[ExperimentSpec] = []
+    for phase in payload.phases:
+        for item in phase.matrix:
+            benchmark = str(item.variables.get("benchmark", "") or "")
+            method = str(item.variables.get("algorithm", "") or item.variables.get("method", "") or "")
+            rows.append(
+                ExperimentSpec(
+                    name=item.name,
+                    target=method,
+                    benchmarks=[benchmark] if benchmark else [],
+                    variables=[str(key) for key in item.variables],
+                    hyperparameters={
+                        key: value
+                        for key, value in item.variables.items()
+                        if key not in {"benchmark", "algorithm", "method", "seed"}
+                    },
+                    metrics=list(item.metrics),
+                    source_section=item.source or phase.phase_id,
+                    run_command=item.run_command,
+                    code_refs=list(item.code_refs),
+                    verify=list(item.verify),
+                )
+            )
+    return rows
+
+
 def make_initial_state(paper: PaperMetadata) -> ResearchState:
     """Build a complete baseline state with placeholders for future phases."""
     return {
@@ -470,7 +569,7 @@ def make_initial_state(paper: PaperMetadata) -> ResearchState:
         "extraction": ExtractionBundle(),
         "review": ReviewRecord(status="pending"),
         "approved_extraction": SectionExtraction(),
-        "planner_output": ExecutionPlan(),
+        "planner_output": empty_planner_envelope(),
         "planner_output_json": {},
         "plan_review": PlanReviewRecord(status="pending"),
         "repo_context": RepoContext(),

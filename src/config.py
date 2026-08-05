@@ -22,6 +22,15 @@ PLANS_DIR = DATA_DIR / "plans"
 RUNS_DIR = DATA_DIR / "runs"
 REPORTS_DIR = DATA_DIR / "reports"
 
+# Deterministic experiment results contract (Executor <-> Reviewer).
+RESULTS_DIR = DATA_DIR / "results"
+RESULTS_SUMMARY_FILENAME = "summary.json"
+RESULTS_METRICS_FILENAME = "metrics.csv"
+RESULTS_LOGS_FILENAME = "logs.txt"
+RESULTS_RUN_DIR_PATTERN = (
+    "YYYY-MM-DD_HH-MM-SS__{benchmark_slug}__{method_slug}__seed-{seed}"
+)
+
 FIXTURES_DIR = ROOT_DIR / "tests" / "fixtures"
 
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
@@ -38,6 +47,7 @@ REASONING_FALLBACK_MODEL = os.getenv("REASONING_FALLBACK_MODEL", "gpt-oss:20b")
 # Shared generation defaults.
 MODEL_TEMPERATURE = float(os.getenv("MODEL_TEMPERATURE", "0"))
 MODEL_NUM_PREDICT = int(os.getenv("MODEL_NUM_PREDICT", "1024"))
+PLANNER_NUM_PREDICT = int(os.getenv("PLANNER_NUM_PREDICT", "4096"))
 
 # Maximum characters fed to the analyst per section call.
 # Each section can be tens of thousands of chars; 12000 gives ~3 pages of dense
@@ -57,6 +67,40 @@ REVIEW_CLOSE_TOLERANCE_PCT = float(os.getenv("REVIEW_CLOSE_TOLERANCE_PCT", "20.0
 PLANNER_MAX_RETRIES = int(os.getenv("PLANNER_MAX_RETRIES", "3"))
 PLANNER_DEFAULT_SETUP_MINUTES = float(os.getenv("PLANNER_DEFAULT_SETUP_MINUTES", "5"))
 PLANNER_MAX_EXAMPLE_COMMANDS = int(os.getenv("PLANNER_MAX_EXAMPLE_COMMANDS", "5"))
+PLANNER_MAX_ENTRYPOINT_HINTS = int(os.getenv("PLANNER_MAX_ENTRYPOINT_HINTS", "10"))
+PLANNER_MAX_CONTEXT_ITEMS = int(os.getenv("PLANNER_MAX_CONTEXT_ITEMS", "30"))
+PLANNER_MAX_NOTE_ITEMS_PER_CATEGORY = int(
+    os.getenv("PLANNER_MAX_NOTE_ITEMS_PER_CATEGORY", "8")
+)
+PLANNER_MAX_NOTE_ITEM_CHARS = int(os.getenv("PLANNER_MAX_NOTE_ITEM_CHARS", "300"))
+# Deterministic deep repo exploration for Planner context.
+PLANNER_REPO_README_CHARS = int(os.getenv("PLANNER_REPO_README_CHARS", "8000"))
+PLANNER_REPO_TREE_DEPTH = int(os.getenv("PLANNER_REPO_TREE_DEPTH", "3"))
+PLANNER_REPO_TREE_MAX_ENTRIES = int(os.getenv("PLANNER_REPO_TREE_MAX_ENTRIES", "200"))
+PLANNER_REPO_MAX_SOURCE_FILES = int(os.getenv("PLANNER_REPO_MAX_SOURCE_FILES", "12"))
+PLANNER_REPO_SOURCE_FILE_CHARS = int(os.getenv("PLANNER_REPO_SOURCE_FILE_CHARS", "2500"))
+PLANNER_REPO_EXPLORATION_CHARS = int(os.getenv("PLANNER_REPO_EXPLORATION_CHARS", "24000"))
+# Phase-based plan: compact axes + a few example matrix rows (full grid expands at runtime).
+PLANNER_PHASE_SEED_COUNT = int(os.getenv("PLANNER_PHASE_SEED_COUNT", "10"))
+PLANNER_PHASE_SYNTHETIC_MAX = int(os.getenv("PLANNER_PHASE_SYNTHETIC_MAX", "3"))
+PLANNER_PHASE_REALWORLD_MAX = int(os.getenv("PLANNER_PHASE_REALWORLD_MAX", "9"))
+PLANNER_PHASE_ALGO_MAX = int(os.getenv("PLANNER_PHASE_ALGO_MAX", "4"))
+PLANNER_PHASE_EXAMPLE_ROWS = int(os.getenv("PLANNER_PHASE_EXAMPLE_ROWS", "3"))
+PLANNER_PHASE_ABLATION_VALUES_MAX = int(os.getenv("PLANNER_PHASE_ABLATION_VALUES_MAX", "5"))
+PLANNER_LIBRARY_TEST_MAX = int(os.getenv("PLANNER_LIBRARY_TEST_MAX", "6"))
+PLANNER_LIBRARY_SMOKE_TESTS = int(os.getenv("PLANNER_LIBRARY_SMOKE_TESTS", "3"))
+PLANNER_SCRIPT_ENTRYPOINTS_MAX = int(os.getenv("PLANNER_SCRIPT_ENTRYPOINTS_MAX", "12"))
+PLANNER_NATIVE_TESTS_MAX = int(os.getenv("PLANNER_NATIVE_TESTS_MAX", "10"))
+PLANNER_CONFIG_FILES_MAX = int(os.getenv("PLANNER_CONFIG_FILES_MAX", "20"))
+PLANNER_MAKE_TARGETS_MAX = int(os.getenv("PLANNER_MAKE_TARGETS_MAX", "12"))
+# Legacy candidate caps kept for exploration helpers.
+PLANNER_MATRIX_CANDIDATE_MAX = int(os.getenv("PLANNER_MATRIX_CANDIDATE_MAX", "12"))
+PLANNER_MATRIX_MAX_FUNCTIONS = int(os.getenv("PLANNER_MATRIX_MAX_FUNCTIONS", "6"))
+PLANNER_MATRIX_MAX_ALGORITHMS = int(os.getenv("PLANNER_MATRIX_MAX_ALGORITHMS", "3"))
+PLANNER_MIN_MATRIX_ROWS = int(os.getenv("PLANNER_MIN_MATRIX_ROWS", "6"))
+# Planner-generated wrapper/driver stubs live under <paper_bundle>/planner_stubs/.
+PLANNER_STUBS_DIRNAME = os.getenv("PLANNER_STUBS_DIRNAME", "planner_stubs")
+PLANNER_STUB_EXAMPLE_ROWS = int(os.getenv("PLANNER_STUB_EXAMPLE_ROWS", "4"))
 
 # Engineer/Executor retry loop.
 MAX_RETRY_ATTEMPTS = int(os.getenv("MAX_RETRY_ATTEMPTS", "5"))

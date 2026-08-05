@@ -6,27 +6,46 @@ from urllib import error
 import src.agents.engineer as engineer_module
 from src.agents.engineer import PaperEngineer
 from src.state import (
+    AgentEnvelope,
     EngineerInputContext,
-    ExecutionPlan,
     PaperMetadata,
+    PlannerPayload,
+    PlanPhase,
     PlanStep,
     RepoContext,
+    project_phases_to_steps,
 )
 
 
 def _sample_context() -> EngineerInputContext:
+    plan = AgentEnvelope[PlannerPayload](
+        schema_version="2.0",
+        agent="planner",
+        status="ok",
+        unknowns=[],
+        warnings=[],
+        payload=PlannerPayload(
+            domain="optimization",
+            objective="reproduce benchmark",
+            phases=[
+                PlanPhase(
+                    phase_id="s1",
+                    title="Setup",
+                    run_template="pytest -q",
+                    matrix=[],
+                )
+            ],
+        ),
+    )
+    step = project_phases_to_steps(plan.payload)[0]
     return EngineerInputContext(
         paper=PaperMetadata(
             paper_id="paper_1",
             title="Example Paper",
             pdf_path="data/papers/example.pdf",
         ),
-        execution_plan=ExecutionPlan(
-            domain="optimization",
-            objective="reproduce benchmark",
-            steps=[PlanStep(step_id="s1", title="Setup", verification=["pytest -q"])],
-        ),
-        plan_step=PlanStep(step_id="s1", title="Setup", verification=["pytest -q"]),
+        execution_plan=plan,
+        plan_step=step,
         repo_context=RepoContext(
             repo_path="/tmp/repo",
             language="python",

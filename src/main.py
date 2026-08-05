@@ -28,6 +28,7 @@ from src.graphs.research_graph import (
     build_phase4_graph,
 )
 from src.persistence import (
+    load_planner_envelope,
     load_reported_results,
     persist_extraction_bundle,
     persist_plan,
@@ -47,10 +48,11 @@ from src.pipeline_nodes import (
     make_reviewer_node,
 )
 from src.state import (
-    ExecutionPlan,
+    AgentEnvelope,
     ExtractionBundle,
     ExecutorResult,
     PaperMetadata,
+    PlannerPayload,
     RepoContext,
     ResearchState,
     ReviewRecord,
@@ -90,8 +92,8 @@ def _print_errors_and_fail(errors: list[str], prefix: str) -> int:
     return 1
 
 
-def _has_real_plan(plan: ExecutionPlan) -> bool:
-    return bool(plan.model_dump(exclude_defaults=True, exclude_none=True))
+def _has_real_plan(plan: AgentEnvelope[PlannerPayload]) -> bool:
+    return bool(plan.payload.plan_summary.strip() or plan.payload.phases)
 
 
 def run_analyst(paper_id: str, non_interactive: bool, with_plan: bool) -> int:
@@ -376,7 +378,7 @@ def run_execute(
 
     payload = json.loads(source_path.read_text(encoding="utf-8"))
     paper = PaperMetadata.model_validate(payload.get("paper", {}))
-    execution_plan = ExecutionPlan.model_validate(payload.get("execution_plan", {}))
+    execution_plan = load_planner_envelope(payload)
     source_extraction_path = payload.get("source_extraction_path", "")
     
     # Resolve repository path - use ingested repo if no explicit path provided
@@ -463,7 +465,7 @@ def run_review(run_path: str | None, paper_id: str | None, extraction_path: str 
 
     payload = json.loads(summary_path.read_text(encoding="utf-8"))
     paper = PaperMetadata.model_validate(payload.get("paper", {}))
-    execution_plan = ExecutionPlan.model_validate(payload.get("execution_plan", {}))
+    execution_plan = load_planner_envelope(payload)
     repo_context = RepoContext.model_validate(payload.get("repo_context", {}))
     executor_result = ExecutorResult.model_validate(payload.get("executor_result", {}))
 

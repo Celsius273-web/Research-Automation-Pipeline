@@ -68,7 +68,11 @@
     "has_code": true,
     "setup_time_minutes": 5,
     "file_tree": "src/, experiments/, results/, requirements.txt",
-    "readme_summary": "Official implementation of Boundary Exploration for Bayesian Optimization With Unknown Physical Constraints (ICML 2024). Run experiments using provided config files and example scripts."
+    "readme_summary": "Official implementation of Boundary Exploration for Bayesian Optimization With Unknown Physical Constraints (ICML 2024). Run experiments using provided config files and example scripts.",
+    "example_commands": [
+      "python exp/run_exp.py --fun FUN_NAME --algo ALGO_NAME --reg-type REGRESSOR --cls-type CLASSIFIER --log-path LOG_PATH",
+      "python exp/run_exp_parallel.py --fun FUN_NAME1 FUN_NAME2 --algo ALGO_NAME1 ALGO_NAME2 --reg-type REGRESSOR --cls-type CLASSIFIER --n-seed N_SEED --log-dir LOG_DIR --num-proc NUM_PROC"
+    ]
   },
   "paper_context": {
     "paper_id": "boundary_exploration_bo",
@@ -78,6 +82,7 @@
   },
   "flags": {
     "has_research_question": true,
+    "has_methodology": true,
     "has_code_repo": true,
     "has_datasets": true,
     "paper_type": "methods"

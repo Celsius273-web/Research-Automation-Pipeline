@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from src.graphs.research_graph import build_phase2_graph
 from src.state import (
-    ExecutionPlan,
+    AgentEnvelope,
     PaperMetadata,
+    PlannerPayload,
     PlanReviewRecord,
+    PlanPhase,
     ReviewRecord,
     SectionExtraction,
     make_initial_state,
@@ -31,9 +33,16 @@ def test_phase2_graph_calls_planner_when_review_approved() -> None:
 
     def planner_node(s):
         calls["planner"] += 1
-        s["planner_output"] = ExecutionPlan(
-            plan_summary="Plan ready",
-            steps=[{"step_id": "step_1", "title": "Run experiment"}],
+        s["planner_output"] = AgentEnvelope[PlannerPayload](
+            schema_version="2.0",
+            agent="planner",
+            status="ok",
+            unknowns=[],
+            warnings=[],
+            payload=PlannerPayload(
+                plan_summary="Plan ready",
+                phases=[PlanPhase(phase_id="step_1", title="Run experiment")],
+            ),
         )
         s["plan_review"] = PlanReviewRecord(status="approved")
         return s
@@ -42,7 +51,7 @@ def test_phase2_graph_calls_planner_when_review_approved() -> None:
     out = graph.invoke(state)
 
     assert calls["planner"] == 1
-    assert out["planner_output"].plan_summary == "Plan ready"
+    assert out["planner_output"].payload.plan_summary == "Plan ready"
 
 
 def test_phase2_graph_skips_planner_when_review_rejected() -> None:

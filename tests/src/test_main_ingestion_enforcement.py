@@ -9,7 +9,7 @@ from unittest.mock import Mock, patch
 import pytest
 
 from src.main import run_analyze, run_execute, run_review
-from src.state import ExecutionPlan, IngestedPaperRecord, PaperMetadata, ReviewerReport
+from src.state import IngestedPaperRecord, PaperMetadata, ReviewerReport, empty_planner_envelope
 
 
 @patch("src.main.get_paper_by_id")
@@ -190,7 +190,7 @@ def test_run_analyze_does_not_persist_default_plan_output(
             ),
             "approved_extraction": Mock(),
             "review": Mock(status="approved"),
-            "planner_output": ExecutionPlan(),
+            "planner_output": empty_planner_envelope(),
             "plan_review": Mock(status="approved"),
             "errors": [],
         }

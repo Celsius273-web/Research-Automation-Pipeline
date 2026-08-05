@@ -26,7 +26,8 @@
     "has_code": "boolean (true if repo contains runnable code)",
     "setup_time_minutes": "number (estimated)",
     "file_tree": "string (one-line summary of main directories)",
-    "readme_summary": "string (first 2-3 sentences of README, or 'No README')"
+    "readme_summary": "string (first 2-3 sentences of README, or 'No README')",
+    "example_commands": ["string (README-discovered run commands)"]
   },
   "paper_context": {
     "paper_id": "string (unique identifier for this paper)",
@@ -36,6 +37,7 @@
   },
   "flags": {
     "has_research_question": "boolean (true if analyst_output.research_question is non-empty)",
+    "has_methodology": "boolean (true if analyst_output.methodology is non-empty)",
     "has_code_repo": "boolean (true if repo_context.has_code is true)",
     "has_datasets": "boolean (true if analyst_output.datasets_or_benchmarks is non-empty)",
     "paper_type": "string (exactly one of: 'methods', 'empirical', 'toolkit')"

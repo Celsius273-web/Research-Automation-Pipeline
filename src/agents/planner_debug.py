@@ -91,18 +91,35 @@ def extract_plan_body(saved_plan: dict[str, Any]) -> dict[str, Any]:
 
 def _core_fields(plan: dict[str, Any]) -> tuple[str, str, list[Any], list[Any]]:
     if "payload" in plan and isinstance(plan["payload"], dict):
-        core = plan["payload"].get("core") or {}
-        ext = plan["payload"].get("extensions") or {}
+        payload = plan["payload"]
+        if "plan_summary" in payload or "phases" in payload or "steps" in payload:
+            phases = list(payload.get("phases") or [])
+            if not phases and (payload.get("steps") or payload.get("experiment_matrix")):
+                phases = list(payload.get("steps") or [])
+            matrix_rows: list[Any] = []
+            for phase in phases:
+                if isinstance(phase, dict):
+                    matrix_rows.extend(list(phase.get("matrix") or []))
+            if not matrix_rows:
+                matrix_rows = list(payload.get("experiment_matrix") or [])
+            return (
+                str(payload.get("plan_summary") or ""),
+                str(payload.get("objective") or ""),
+                phases,
+                matrix_rows,
+            )
+        core = payload.get("core") or {}
+        ext = payload.get("extensions") or {}
         return (
             str(core.get("plan_summary") or ""),
             str(core.get("objective") or ""),
-            list(core.get("steps") or []),
+            list(core.get("phases") or core.get("steps") or []),
             list(ext.get("experiment_matrix") or []),
         )
     return (
         str(plan.get("plan_summary") or ""),
         str(plan.get("objective") or ""),
-        list(plan.get("steps") or []),
+        list(plan.get("phases") or plan.get("steps") or []),
         list(plan.get("experiment_matrix") or []),
     )
 
@@ -139,11 +156,11 @@ def compare_planner_output_to_saved_plan(
     else:
         notes.append("objective matches saved plan.")
 
-    notes.append(f"steps: llm={len(out_steps)} saved={len(save_steps)}")
-    notes.append(f"experiment_matrix: llm={len(out_exps)} saved={len(save_exps)}")
+    notes.append(f"phases: llm={len(out_steps)} saved={len(save_steps)}")
+    notes.append(f"matrix_rows: llm={len(out_exps)} saved={len(save_exps)}")
 
     if not save_summary and not save_objective and not save_steps:
-        notes.append("WARNING: saved plan is empty (no summary, objective, or steps).")
+        notes.append("WARNING: saved plan is empty (no summary, objective, or phases).")
 
     analyst = (received_context or {}).get("analyst_output") or {}
     rq = str(analyst.get("research_question") or "")
@@ -201,6 +218,7 @@ def _summarize_analyst(analyst: dict[str, Any]) -> list[str]:
         f"- notes chars: {len(str(analyst.get('notes') or ''))}",
         f"- keys: {sorted(analyst.keys())}",
     ]
+    #needs to be updated to handle the new analyst output structure + a way to check if the analyst output is correct
 
 def render_planner_debug_markdown(
     trace: PlannerDebugTrace,

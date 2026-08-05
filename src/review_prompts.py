@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from src.state import (
+    AgentEnvelope,
     EngineerOutput,
     EngineerReviewRecord,
-    ExecutionPlan,
+    PlannerPayload,
     PlanReviewRecord,
     ReviewRecord,
     SectionExtraction,
@@ -107,20 +108,20 @@ def run_cli_review(extraction: SectionExtraction) -> tuple[SectionExtraction, Re
     return extraction, ReviewRecord(status="rejected", notes=notes)
 
 
-def run_cli_plan_review(plan: ExecutionPlan | AgentEnvelope[PlannerPayload]) -> tuple[ExecutionPlan | AgentEnvelope[PlannerPayload], PlanReviewRecord]:
+def run_cli_plan_review(
+    plan: AgentEnvelope[PlannerPayload],
+) -> tuple[AgentEnvelope[PlannerPayload], PlanReviewRecord]:
     print("\n--- Planner review checkpoint ---")
-    if isinstance(plan, ExecutionPlan):
-        print(f"Summary: {plan.plan_summary or '(empty)'}")
-        print(f"Objective: {plan.objective or '(empty)'}")
-        print("Steps:")
-        for idx, step in enumerate(plan.steps, start=1):
-            print(f"  {idx}. {step.step_id} - {step.title}")
-    else:
-        print(f"Summary: {plan.payload.core.plan_summary or '(empty)'}")
-        print(f"Objective: {plan.payload.core.objective or '(empty)'}")
-        print("Steps:")
-        for idx, step in enumerate(plan.payload.core.steps, start=1):
-            print(f"  {idx}. {step.step_id} - {step.title}")
+    print(f"Summary: {plan.payload.plan_summary or '(empty)'}")
+    print(f"Objective: {plan.payload.objective or '(empty)'}")
+    print("Phases:")
+    for idx, phase in enumerate(plan.payload.phases, start=1):
+        deps = f" (depends_on={phase.depends_on})" if phase.depends_on else ""
+        axes = ",".join(phase.variables) if phase.variables else "-"
+        print(
+            f"  {idx}. {phase.phase_id} - {phase.title}{deps} "
+            f"[axes={axes}; example_rows={len(phase.matrix)}]"
+        )
 
     choice = prompt_input("[a]pprove / [e]dit / [r]eject plan (default a)").lower()
     if choice in ("", "a"):
@@ -134,20 +135,14 @@ def run_cli_plan_review(plan: ExecutionPlan | AgentEnvelope[PlannerPayload]) -> 
     edited_fields: list[str] = []
     summary = prompt_input("New plan_summary (enter to keep)", optional=True)
     if summary:
-        if isinstance(edited, ExecutionPlan):
-            edited.plan_summary = summary
-        else:
-            edited.payload.core.plan_summary = summary
+        edited.payload.plan_summary = summary
         edited_fields.append("plan_summary")
     missing_context = prompt_input(
         "Add missing_context items (comma-separated, enter to keep)",
         optional=True,
     )
     if missing_context:
-        if isinstance(edited, ExecutionPlan):
-            edited.missing_context = parse_list_input(missing_context)
-        else:
-            edited.payload.extensions.missing_context = parse_list_input(missing_context)
+        edited.payload.missing_context = parse_list_input(missing_context)
         edited_fields.append("missing_context")
     notes = prompt_input("Review notes", optional=True)
     return (

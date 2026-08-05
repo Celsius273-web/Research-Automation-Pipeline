@@ -11,7 +11,6 @@ from src.config import PAPER_BUNDLES_DIR, PLANNER_DEFAULT_SETUP_MINUTES
 from src.state import (
     AgentEnvelope,
     ExtractionBundle,
-    ExecutionPlan,
     PaperMetadata,
     PlannerPayload,
     RepoContext,
@@ -21,6 +20,7 @@ from src.state import (
 )
 from src.tools.language_detect import detect_language
 from src.tools.repo_context import (
+    extract_entrypoint_hints,
     extract_example_commands,
     infer_build_command,
     summarize_readme,
@@ -93,6 +93,7 @@ class PaperBundle:
         detected.readme_summary = summarize_readme(self.code_dir)
         detected.build_system = infer_build_command(self.code_dir, detected.build_system)
         detected.example_commands = extract_example_commands(self.code_dir)
+        detected.entrypoint_hints = extract_entrypoint_hints(self.code_dir)
         return detected
 
     def get_setup_guide(self) -> str:
@@ -167,32 +168,25 @@ class PaperBundle:
         
         self.extraction_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
-    def get_plan(self) -> Optional[ExecutionPlan | AgentEnvelope[PlannerPayload]]:
+    def get_plan(self) -> Optional[AgentEnvelope[PlannerPayload]]:
         """Load execution plan from the paper bundle."""
         if not self.plan_path.exists():
             return None
             
         try:
+            from src.persistence import load_planner_envelope
+
             data = json.loads(self.plan_path.read_text(encoding="utf-8"))
-            
-            # Try new AgentEnvelope format first
-            if "schema_version" in data and data.get("schema_version") == "2.0":
-                return AgentEnvelope[PlannerPayload].model_validate(data)
-            elif "execution_plan" in data:
-                # Legacy format
-                return ExecutionPlan.model_validate(data["execution_plan"])
-            else:
-                # Direct plan format
-                return ExecutionPlan.model_validate(data)
+            return load_planner_envelope(data)
                 
-        except (json.JSONDecodeError, FileNotFoundError, KeyError) as exc:
+        except (json.JSONDecodeError, FileNotFoundError, KeyError, ValueError) as exc:
             logger.warning("Failed to load plan for %s: %s", self.paper_id, exc)
         
         return None
 
     def save_plan(
         self,
-        plan: ExecutionPlan | AgentEnvelope[PlannerPayload],
+        plan: AgentEnvelope[PlannerPayload],
         plan_review: ReviewRecord,
         paper: PaperMetadata,
         source_extraction_path: Optional[str] = None,
@@ -204,12 +198,8 @@ class PaperBundle:
             "paper": paper.model_dump(),
             "plan_review": plan_review.model_dump(),
             "source_extraction_path": source_extraction_path or str(self.extraction_path),
+            "plan_envelope": plan.model_dump(),
         }
-        
-        if isinstance(plan, ExecutionPlan):
-            payload["execution_plan"] = plan.model_dump()
-        else:
-            payload["plan_envelope"] = plan.model_dump()
         
         self.plan_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
@@ -290,14 +280,9 @@ class PaperBundle:
                 paper = PaperMetadata.model_validate(data["paper"])
                 plan_review = data.get("plan_review", {"status": "approved", "notes": "Migrated from legacy"})
                 
-                if "execution_plan" in data:
-                    plan = ExecutionPlan.model_validate(data["execution_plan"])
-                elif "plan_envelope" in data:
-                    plan = AgentEnvelope[PlannerPayload].model_validate(data["plan_envelope"])
-                else:
-                    # Direct plan format
-                    plan = ExecutionPlan.model_validate(data)
-                    
+                from src.persistence import load_planner_envelope
+
+                plan = load_planner_envelope(data)
                 self.save_plan(plan, ReviewRecord.model_validate(plan_review), paper, str(extraction_path) if extraction_path else None)
                 logger.info("Migrated plan for %s", self.paper_id)
             except Exception as exc:

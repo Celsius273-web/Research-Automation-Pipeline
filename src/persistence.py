@@ -8,10 +8,10 @@ from pathlib import Path
 from src.bundle import PaperBundle
 from src.agents.planner_debug import refresh_planner_debug_with_saved_plan
 from src.config import EXTRACTIONS_DIR, PLANS_DIR, REPORTS_DIR, RUNS_DIR
+from src.agents.planner import _normalize_planner_payload
 from src.state import (
     AgentEnvelope,
     ExtractionBundle,
-    ExecutionPlan,
     ExecutorResult,
     PaperMetadata,
     PlannerPayload,
@@ -24,6 +24,49 @@ from src.state import (
     SectionExtraction,
 )
 from src.tools import report_builder
+
+
+def load_planner_envelope(payload: dict) -> AgentEnvelope[PlannerPayload]:
+    """Load a planner envelope from a saved plan artifact."""
+    if "plan_envelope" in payload:
+        raw = payload["plan_envelope"]
+        if isinstance(raw, dict) and isinstance(raw.get("payload"), dict):
+            raw = dict(raw)
+            raw["payload"] = _normalize_planner_payload(raw["payload"])
+        return AgentEnvelope[PlannerPayload].model_validate(raw)
+    if payload.get("schema_version") == "2.0" and payload.get("agent") == "planner":
+        raw = dict(payload)
+        if isinstance(raw.get("payload"), dict):
+            raw["payload"] = _normalize_planner_payload(raw["payload"])
+        return AgentEnvelope[PlannerPayload].model_validate(raw)
+    # Older flat plan dumps (execution_plan or bare plan body).
+    plan_body = payload.get("execution_plan", payload)
+    if not isinstance(plan_body, dict):
+        plan_body = {}
+    normalized = _normalize_planner_payload(
+        {
+            "plan_summary": str(plan_body.get("plan_summary", "")),
+            "domain": str(plan_body.get("domain", "")),
+            "objective": str(plan_body.get("objective", "")),
+            "steps": plan_body.get("steps", []) or [],
+            "experiment_matrix": plan_body.get("experiment_matrix", []) or [],
+            "phases": plan_body.get("phases", []) or [],
+            "assumptions": plan_body.get("assumptions", []) or [],
+            "constraints": plan_body.get("constraints", []) or [],
+            "missing_context": plan_body.get("missing_context", []) or [],
+            "verification_checks": plan_body.get("verification_checks", []) or [],
+            "risks": plan_body.get("risks", []) or [],
+            "results_summary_path": str(plan_body.get("results_summary_path", "")),
+        }
+    )
+    return AgentEnvelope[PlannerPayload](
+        schema_version="2.0",
+        agent="planner",
+        status="ok",
+        unknowns=[],
+        warnings=["loaded from legacy plan artifact"],
+        payload=PlannerPayload.model_validate(normalized),
+    )
 
 
 def _format_bundle_as_text(paper: PaperMetadata, bundle: ExtractionBundle) -> str:
@@ -77,7 +120,7 @@ def persist_extraction(paper: PaperMetadata, extraction: SectionExtraction, revi
 
 def persist_plan(
     paper: PaperMetadata,
-    plan: ExecutionPlan | AgentEnvelope[PlannerPayload],
+    plan: AgentEnvelope[PlannerPayload],
     plan_review: PlanReviewRecord,
     source_extraction_path: str | None = None,
 ) -> Path:
@@ -96,7 +139,7 @@ def persist_plan(
 
 def persist_run_summary(
     paper: PaperMetadata,
-    execution_plan: ExecutionPlan,
+    execution_plan: AgentEnvelope[PlannerPayload],
     repo_context: RepoContext,
     executor_result: ExecutorResult,
 ) -> Path:
@@ -105,7 +148,7 @@ def persist_run_summary(
     output = run_dir / "run_summary.json"
     payload = {
         "paper": paper.model_dump(),
-        "execution_plan": execution_plan.model_dump(),
+        "plan_envelope": execution_plan.model_dump(),
         "repo_context": repo_context.model_dump(),
         "executor_result": executor_result.model_dump(),
     }
