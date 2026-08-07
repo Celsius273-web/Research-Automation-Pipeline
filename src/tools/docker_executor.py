@@ -2,13 +2,54 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 import time
 
 import requests
 
-from src.config import EXECUTOR_TIMEOUT_SECONDS
+from src.config import EXECUTOR_LOG_MAX_CHARS, EXECUTOR_TIMEOUT_SECONDS
+
+
+def _trim_text(text: str, max_chars: int = EXECUTOR_LOG_MAX_CHARS) -> str:
+    if len(text) <= max_chars:
+        return text
+    return text[:max_chars]
+
+
+def resolve_docker_base_url() -> str | None:
+    """Prefer DOCKER_HOST, then Docker Desktop's user socket, then /var/run/docker.sock."""
+    env_host = os.getenv("DOCKER_HOST", "").strip()
+    if env_host:
+        return env_host
+
+    # Docker Desktop on macOS exposes the engine here; /var/run/docker.sock is often absent.
+    candidates = [
+        Path.home() / ".docker" / "run" / "docker.sock",
+        Path("/var/run/docker.sock"),
+    ]
+    for socket_path in candidates:
+        if socket_path.exists():
+            return f"unix://{socket_path}"
+    return None
+
+
+def create_docker_client(docker_module: object) -> object:
+    """Create a Docker client with a clear error when the daemon socket is missing."""
+    base_url = resolve_docker_base_url()
+    try:
+        if base_url is not None:
+            return docker_module.DockerClient(base_url=base_url)  # type: ignore[attr-defined]
+        return docker_module.from_env()  # type: ignore[attr-defined]
+    except Exception as exc:
+        desktop_sock = Path.home() / ".docker" / "run" / "docker.sock"
+        raise RuntimeError(
+            "Cannot connect to the Docker daemon. "
+            "Start Docker Desktop, then retry. On macOS the Python SDK often needs:\n"
+            f"  export DOCKER_HOST=unix://{desktop_sock}\n"
+            f"Underlying error: {exc}"
+        ) from exc
 
 
 @dataclass
@@ -32,7 +73,7 @@ class DockerExecutor:
             raise RuntimeError("Docker SDK not installed. Add 'docker' to requirements.") from exc
 
         self._docker = docker
-        self.client = docker.from_env()
+        self.client = create_docker_client(docker)
 
     def build_image(self, language: str, dockerfile_path: str) -> str:
         if language in self.image_cache:
@@ -90,8 +131,10 @@ class DockerExecutor:
             exit_code = int(wait_result.get("StatusCode", 1))
             logs_bytes = container.logs(stdout=True, stderr=False)
             err_bytes = container.logs(stdout=False, stderr=True)
-            stdout = logs_bytes.decode("utf-8", errors="replace") if logs_bytes else ""
-            stderr = err_bytes.decode("utf-8", errors="replace") if err_bytes else stderr
+            stdout = _trim_text(logs_bytes.decode("utf-8", errors="replace") if logs_bytes else "")
+            stderr = _trim_text(
+                err_bytes.decode("utf-8", errors="replace") if err_bytes else stderr
+            )
             return ContainerRunResult(
                 stdout=stdout,
                 stderr=stderr,

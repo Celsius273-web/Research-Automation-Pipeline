@@ -96,7 +96,11 @@ def test_repo_context_helpers_extract_concrete_setup(tmp_path: Path) -> None:
 
     assert summarize_repo_tree(tmp_path) == "README.md, exp/, run.py"
     assert summarize_readme(tmp_path).startswith("Demo Official implementation.")
-    assert infer_build_command(tmp_path, "unknown") == "pip install numpy torch"
+    assert infer_build_command(tmp_path, "unknown") == (
+        "python -m venv --clear .venv && "
+        ".venv/bin/pip install -U pip && "
+        ".venv/bin/pip install numpy torch"
+    )
     assert extract_example_commands(tmp_path) == [
         "python exp/run_exp.py --fun townsend --algo becbo"
     ]

@@ -7,18 +7,27 @@ from pathlib import Path
 
 from src.bundle import PaperBundle
 from src.agents.planner_debug import refresh_planner_debug_with_saved_plan
-from src.config import EXTRACTIONS_DIR, PLANS_DIR, REPORTS_DIR, RUNS_DIR
+from src.config import (
+    ENGINEER_METRICS_FILENAME,
+    EXTRACTIONS_DIR,
+    PLANS_DIR,
+    REPORTS_DIR,
+    REVIEWER_REPORT_FILENAME,
+    RUNS_DIR,
+)
 from src.agents.planner import _normalize_planner_payload
 from src.state import (
     AgentEnvelope,
     ExtractionBundle,
     ExecutorResult,
+    MetricsDocument,
     PaperMetadata,
     PlannerPayload,
     PlanReviewRecord,
     ReportedResult,
     RepoContext,
     ReviewerReport,
+    ReviewerRunReport,
     ReviewRecord,
     SECTION_NAMES,
     SectionExtraction,
@@ -304,3 +313,61 @@ def load_reported_results(extraction_path: Path | None) -> list[ReportedResult]:
         return extraction.reported_results
     except (json.JSONDecodeError, KeyError, ValueError):
         return []
+
+
+def resolve_run_dir(paper_id: str, run_id: str) -> Path:
+    """Resolve ``data/papers/{paper_id}/runs/{run_id}/`` (``R1``, ``R2``, … or legacy timestamps)."""
+    run_id = (run_id or "").strip()
+    if not run_id:
+        raise ValueError("run_id is required (e.g. R1 under runs/R1/).")
+    if "/" in run_id or "\\" in run_id or run_id in {".", ".."}:
+        raise ValueError(f"Invalid run_id {run_id!r}; pass only the directory name (R1, R2, …).")
+
+    bundle = PaperBundle(paper_id)
+    path = (bundle.runs_dir / run_id).resolve()
+    if not path.is_dir():
+        raise FileNotFoundError(
+            f"Run directory does not exist: {path}. "
+            f"List runs under {bundle.runs_dir} (R1, R2, …)."
+        )
+    return path
+
+
+def resolve_latest_run_dir(paper_id: str, run_dir: str | None = None) -> Path:
+    """Deprecated helper: prefer resolve_run_dir(paper_id, run_id).
+
+    Kept for older callers that pass an absolute ``run_dir`` path.
+    """
+    if run_dir:
+        path = Path(run_dir).resolve()
+        if not path.exists():
+            raise FileNotFoundError(f"Run directory does not exist: {path}")
+        return path
+
+    bundle = PaperBundle(paper_id)
+    if not bundle.runs_dir.exists():
+        raise FileNotFoundError(f"No runs directory for paper '{paper_id}': {bundle.runs_dir}")
+
+    candidates = [path for path in bundle.runs_dir.iterdir() if path.is_dir()]
+    if not candidates:
+        raise FileNotFoundError(f"No timestamped runs found for paper '{paper_id}'.")
+    return max(candidates, key=lambda path: path.name)
+
+
+def load_metrics_document(run_directory: Path) -> MetricsDocument:
+    metrics_path = run_directory / ENGINEER_METRICS_FILENAME
+    if not metrics_path.exists():
+        raise FileNotFoundError(f"metrics.json not found in run directory: {run_directory}")
+    payload = json.loads(metrics_path.read_text(encoding="utf-8"))
+    return MetricsDocument.model_validate(payload)
+
+
+def persist_reviewer_run_report(
+    run_directory: Path,
+    report: ReviewerRunReport,
+    paper_id: str | None = None,
+) -> Path:
+    _ = paper_id
+    output = run_directory / REVIEWER_REPORT_FILENAME
+    output.write_text(json.dumps(report.model_dump(), indent=2), encoding="utf-8")
+    return output

@@ -92,11 +92,10 @@ Requires an **approved extraction artifact** (run Analyst first).
 
 ```bash
 # Execute plan + run reviewer
-.venv/bin/python -m src.main execute --paper-id <paper_id> --with-review
+python -m src.main engineer --paper-id boundary_exploration_bo --non-interactive
+python -m src.main reviewer --paper-id boundary_exploration_bo --non-interactive
 
-# Execute against a different local repo
-.venv/bin/python -m src.main execute --paper-id <paper_id> \
-  --repo-path "/path/to/different/repo" --with-review
+
 ```
 
 ---

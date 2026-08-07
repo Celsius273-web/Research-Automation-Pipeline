@@ -50,7 +50,13 @@ Operating procedure:
    build files; mark data/container gaps in missing_context.
 7. Prefer status ok/partial. Block only when both research_question and methodology are absent.
 8. results_summary_path must equal results_contract.summary_path.
-9. Deterministic verification (post-scaffold) keeps only grounded runnable matrix rows
+9. Do not put ``python -m venv`` or ``.venv/bin/`` in setup/run commands. Use bare
+   ``pip install …`` and ``python …``. Engineer creates a workspace-mounted venv at runtime.
+10. Engineer runs ``matrix`` rows only by default (not the full ``axes`` cartesian product).
+    Put every run you want executed into ``matrix`` with concrete ``run_command`` /
+    ``results_path``. Use ``axes`` to document the broader paper suite / intent.
+    Keep matrices small unless a full paper reproduction is explicitly required.
+11. Deterministic verification (post-scaffold) keeps only grounded runnable matrix rows
    (entrypoint exists, flags documented). Manual OrderedDict edits, unit-test-as-
    reproduction, and undocumented flags are repaired via Planner stubs under
    planner_stubs/ when possible, otherwise those phases are collapsed (blocked) and

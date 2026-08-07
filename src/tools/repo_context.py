@@ -224,21 +224,35 @@ def extract_entrypoint_hints(repo_path: Path) -> list[str]:
 
 
 def infer_build_command(repo_path: Path, detected_build_system: str) -> str:
-    """Convert repository markers into an executable setup command."""
+    """Convert repository markers into an executable setup command.
+
+    Python repos get a persistent repo-local venv so Docker container teardown
+    does not wipe installed paper dependencies.
+    """
+    from src.tools.paper_venv import build_persistent_setup_command, is_python_install_command
+
+    install = ""
     if (repo_path / "requirements.txt").is_file():
-        return "pip install -r requirements.txt"
-    if (repo_path / "pyproject.toml").is_file() or (repo_path / "setup.py").is_file():
-        return "pip install ."
-    if (repo_path / "CMakeLists.txt").is_file():
+        install = "pip install -r requirements.txt"
+    elif (repo_path / "pyproject.toml").is_file() or (repo_path / "setup.py").is_file():
+        install = "pip install ."
+    elif (repo_path / "CMakeLists.txt").is_file():
         return "cmake -S . -B build && cmake --build build"
-    if (repo_path / "Makefile").is_file() or (repo_path / "makefile").is_file():
+    elif (repo_path / "Makefile").is_file() or (repo_path / "makefile").is_file():
         return "make"
-    if (repo_path / "Cargo.toml").is_file():
+    elif (repo_path / "Cargo.toml").is_file():
         return "cargo build"
-    content = _read_readme(repo_path)
-    if content is not None:
-        for line in content.splitlines():
-            command = line.strip()
-            if command.startswith(("pip install ", "python -m pip install ")):
-                return command
-    return detected_build_system
+    else:
+        content = _read_readme(repo_path)
+        if content is not None:
+            for line in content.splitlines():
+                command = line.strip()
+                if command.startswith(("pip install ", "python -m pip install ")):
+                    install = command
+                    break
+        if not install:
+            install = detected_build_system
+
+    if is_python_install_command(install) or install in {"", "unknown"}:
+        return build_persistent_setup_command(install, repo_path=repo_path)
+    return install

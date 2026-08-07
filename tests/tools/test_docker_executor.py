@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-from src.tools.docker_executor import DockerExecutor
+from src.tools.docker_executor import DockerExecutor, resolve_docker_base_url
 
 
 class _FakeContainer:
@@ -46,8 +46,26 @@ class _FakeDockerClient:
 
 
 def _monkeypatch_docker(monkeypatch, fake_client: _FakeDockerClient) -> None:
-    fake_module = SimpleNamespace(from_env=lambda: fake_client)
+    fake_module = SimpleNamespace(
+        from_env=lambda **_kwargs: fake_client,
+        DockerClient=lambda **_kwargs: fake_client,
+        errors=SimpleNamespace(APIError=Exception),
+    )
     monkeypatch.setitem(__import__("sys").modules, "docker", fake_module)
+
+
+def test_resolve_docker_base_url_prefers_env(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("DOCKER_HOST", "unix:///tmp/custom.sock")
+    assert resolve_docker_base_url() == "unix:///tmp/custom.sock"
+
+
+def test_resolve_docker_base_url_finds_desktop_socket(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("DOCKER_HOST", raising=False)
+    desktop_sock = tmp_path / ".docker" / "run" / "docker.sock"
+    desktop_sock.parent.mkdir(parents=True)
+    desktop_sock.touch()
+    monkeypatch.setattr(Path, "home", lambda: tmp_path)
+    assert resolve_docker_base_url() == f"unix://{desktop_sock}"
 
 
 def test_build_image_uses_cache(monkeypatch, tmp_path: Path) -> None:

@@ -387,6 +387,43 @@ class MetricResult(BaseModel):
     source_path: str = ""
 
 
+class CapturedMetric(BaseModel):
+    """One metric row written to runs/{timestamp}/metrics.json."""
+
+    benchmark: str = ""
+    algorithm: str = ""
+    metric_name: str
+    value: float | str
+    source: str = ""
+
+
+class ExperimentMatrixRow(BaseModel):
+    """One planned/executed matrix cell recorded alongside metrics."""
+
+    phase_id: str = ""
+    name: str = ""
+    benchmark: str = ""
+    algorithm: str = ""
+    seed: str = ""
+    results_path: str = ""
+    status: Literal["completed", "failed", "skipped"] = "completed"
+
+
+class MetricsDocument(BaseModel):
+    """Engineer run artifact consumed by Reviewer."""
+
+    run_status: Literal["SUCCESS", "PARTIAL", "FAILED"] = "FAILED"
+    exit_code: int = 1
+    attempts: int = 0
+    timestamp: str = ""
+    metrics: list[CapturedMetric] = Field(default_factory=list)
+    experiment_matrix: list[ExperimentMatrixRow] = Field(default_factory=list)
+    logs_captured: bool = False
+    phases_completed: list[str] = Field(default_factory=list)
+    phases_failed: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+
+
 class RunAttempt(BaseModel):
     attempt_number: int = 0
     step_id: str = ""
@@ -410,9 +447,40 @@ class ExecutorResult(BaseModel):
 
 class ReportedResult(BaseModel):
     benchmark: str = ""
+    algorithm: str = ""
     metric_name: str
     value: str
     source: str = ""
+
+
+class MatchedMetricRow(BaseModel):
+    metric_name: str
+    benchmark: str = ""
+    algorithm: str = ""
+    reported_value: float | str
+    captured_value: float | str
+    delta_pct: float | None = None
+    match_status: Literal["match", "close", "diverged"] = "diverged"
+
+
+class MissingMetricRow(BaseModel):
+    metric_name: str
+    benchmark: str = ""
+    algorithm: str = ""
+    reason: str = "not_captured"
+
+
+class ReviewerRunReport(BaseModel):
+    """Deterministic Engineer/Reviewer file contract (reviewer_report.json)."""
+
+    paper_id: str = ""
+    reported_count: int = 0
+    captured_count: int = 0
+    metrics_matched: list[MatchedMetricRow] = Field(default_factory=list)
+    metrics_missing: list[MissingMetricRow] = Field(default_factory=list)
+    confidence: Literal["HIGH", "MEDIUM", "LOW"] = "LOW"
+    gaps: list[str] = Field(default_factory=list)
+    summary: str = ""
 
 
 class ComparisonRow(BaseModel):

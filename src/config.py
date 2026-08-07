@@ -60,7 +60,8 @@ ANALYST_MAX_RESULT_CHUNKS = int(os.getenv("ANALYST_MAX_RESULT_CHUNKS", "4"))
 ANALYST_NUM_PREDICT = int(os.getenv("ANALYST_NUM_PREDICT", str(max(MODEL_NUM_PREDICT, 2048))))
 ANALYST_MAX_EXTRACTED_TABLES = int(os.getenv("ANALYST_MAX_EXTRACTED_TABLES", "20"))
 
-REVIEW_MATCH_TOLERANCE_PCT = float(os.getenv("REVIEW_MATCH_TOLERANCE_PCT", "5.0"))
+# Match thresholds used by Reviewer delta classification (match / close / diverged).
+REVIEW_MATCH_TOLERANCE_PCT = float(os.getenv("REVIEW_MATCH_TOLERANCE_PCT", "2.0"))
 REVIEW_CLOSE_TOLERANCE_PCT = float(os.getenv("REVIEW_CLOSE_TOLERANCE_PCT", "20.0"))
 
 # Agent reasoning and retry configuration.
@@ -80,7 +81,7 @@ PLANNER_REPO_TREE_MAX_ENTRIES = int(os.getenv("PLANNER_REPO_TREE_MAX_ENTRIES", "
 PLANNER_REPO_MAX_SOURCE_FILES = int(os.getenv("PLANNER_REPO_MAX_SOURCE_FILES", "12"))
 PLANNER_REPO_SOURCE_FILE_CHARS = int(os.getenv("PLANNER_REPO_SOURCE_FILE_CHARS", "2500"))
 PLANNER_REPO_EXPLORATION_CHARS = int(os.getenv("PLANNER_REPO_EXPLORATION_CHARS", "24000"))
-# Phase-based plan: compact axes + a few example matrix rows (full grid expands at runtime).
+# Phase-based plan: compact axes + concrete matrix rows (what Engineer runs by default).
 PLANNER_PHASE_SEED_COUNT = int(os.getenv("PLANNER_PHASE_SEED_COUNT", "10"))
 PLANNER_PHASE_SYNTHETIC_MAX = int(os.getenv("PLANNER_PHASE_SYNTHETIC_MAX", "3"))
 PLANNER_PHASE_REALWORLD_MAX = int(os.getenv("PLANNER_PHASE_REALWORLD_MAX", "9"))
@@ -102,9 +103,27 @@ PLANNER_MIN_MATRIX_ROWS = int(os.getenv("PLANNER_MIN_MATRIX_ROWS", "6"))
 PLANNER_STUBS_DIRNAME = os.getenv("PLANNER_STUBS_DIRNAME", "planner_stubs")
 PLANNER_STUB_EXAMPLE_ROWS = int(os.getenv("PLANNER_STUB_EXAMPLE_ROWS", "4"))
 
+# Default off: Engineer runs plan matrix rows only (fast). Set ENGINEER_EXPAND_FULL_AXES=1
+# to expand phase.axes into the full cartesian product (paper-scale suites).
+ENGINEER_EXPAND_FULL_AXES = os.getenv("ENGINEER_EXPAND_FULL_AXES", "0").strip().lower() in {
+    "1",
+    "true",
+    "yes",
+}
+
 # Engineer/Executor retry loop.
 MAX_RETRY_ATTEMPTS = int(os.getenv("MAX_RETRY_ATTEMPTS", "5"))
+# Plan-driven Engineer CLI retries the same command without LLM patches.
+ENGINEER_MAX_ATTEMPTS = int(os.getenv("ENGINEER_MAX_ATTEMPTS", "3"))
 EXECUTOR_TIMEOUT_SECONDS = int(os.getenv("EXECUTOR_TIMEOUT_SECONDS", "600"))
+EXECUTOR_LOG_MAX_CHARS = int(os.getenv("EXECUTOR_LOG_MAX_CHARS", "20000"))
+# Skip a paper when free RAM is below this threshold (16GB hosts get tight under Docker).
+MIN_FREE_MEMORY_GB = float(os.getenv("MIN_FREE_MEMORY_GB", "2.0"))
+ENGINEER_METRICS_FILENAME = "metrics.json"
+ENGINEER_LOG_FILENAME = "engineer.log"
+REVIEWER_REPORT_FILENAME = "reviewer_report.json"
+# Paper-repo venv created inside the Docker-mounted workspace so installs survive container teardown.
+PAPER_VENV_DIRNAME = os.getenv("PAPER_VENV_DIRNAME", ".venv")
 
 # Paper ingestion pipeline.
 INGEST_CLONE_TIMEOUT_SECONDS = int(os.getenv("INGEST_CLONE_TIMEOUT_SECONDS", "300"))

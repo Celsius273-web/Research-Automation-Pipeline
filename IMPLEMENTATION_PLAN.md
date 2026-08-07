@@ -10,11 +10,23 @@ A 16GB Mac gives roughly 11 to 11.5 GB of usable memory for model weights, after
 
 Model assignments:
 
-- Paper Analyst: Qwen3 8B or Qwen 3.5 9B or Gemma3:12B
-- Planner: Qwen3 8B or Qwen 3.5 9B or Gemma3:12B
-- Engineer: Qwen2.5-Coder 7B
-- Executor: no model, deterministic code only
-- Reviewer: Qwen3 8B or Qwen 3.5 9B or Gemma3:12B
+NALYST_MODEL=qwen3.5:9b
+PLANNER_MODEL=qwen3.5:9b
+ENGINEER_MODEL=qwen2.5-coder:7b
+REVIEWER_MODEL=qwen3.5:9b
+REASONING_FALLBACK_MODEL=gpt-oss:20b
+
+# LLM Generation Settings
+MODEL_TEMPERATURE=0.1
+MODEL_NUM_PREDICT=2048
+PLANNER_NUM_PREDICT=4096
+# Review Tolerances
+REVIEW_MATCH_TOLERANCE_PCT=5.0
+REVIEW_CLOSE_TOLERANCE_PCT=20.0
+
+# Execution Settings
+MAX_RETRY_ATTEMPTS=5
+EXECUTOR_TIMEOUT_SECONDS=600
 
 Load one model at a time. Never run two Ollama models in parallel.
 
@@ -187,4 +199,20 @@ Test: confirm the final approved file has 10 to 15 papers, each with a confirmed
 ## Evaluation and metrics
 
 Define the reproduction similarity metric, the recovery criteria, and the retry-counting method before running the full paper set. Do not report figures such as reproduction rate or accuracy until they come from real runs against the approved paper set. A defensible methodology matters more for a resume project than an impressive-sounding number with no method behind it.
+
+## Environment Setup Best Practices
+
+Docker runs for Engineer are ephemeral: each phase command typically starts a new container with the paper repo mounted read/write at `/workspace`. That mount is what persists across phases — not the container's system Python site-packages.
+
+1. **Do not put `python -m venv` in Planner plans.** Plans describe *what* to install and run (`pip install …`, `python exp/run_exp.py …`). Embedding a venv create step in the plan mixes Docker persistence policy into paper-specific planning and is easy to get wrong.
+2. **Bare `pip` / `python` in the plan; mounted `.venv` at runtime.** Engineer rewrites setup to `python -m venv --clear .venv && .venv/bin/pip …` and rewrites later `python` invocations to `.venv/bin/python`. The venv lives under the mounted repo (`code/.venv`), so it survives container teardown. Installing only into the container's system site-packages does **not** persist to the next phase container.
+3. **Python version belongs in extraction / image selection, not an ad-hoc in-container venv invent.** If a repo needs Python 3.8 (e.g. old GPyTorch/BoTorch pins), record that in extraction notes and use the matching Docker base image. Do not try to invent a host-side venv outside the mount.
+4. **Verify `results_summary_path` against real repo outputs.** The contract path is `results/{paper_id}/summary.json`. Many repos never write that file (BE-CBO writes per-run `.pkl` under `--log-path`). Grep the repo's main scripts or inspect prior artifacts; Planner should note gaps in `missing_context` so Engineer/Reviewer expectations stay honest.
+5. **Run artifacts layout.** Engineer writes only under `data/papers/{paper_id}/runs/R{n}/`
+   (`engineer.log`, `metrics.json` with `experiment_matrix` + captured metrics, later
+   `reviewer_report.json`). Run ids are sequential (`R1`, `R2`, …), not timestamps. Pass
+   that id as `--run-id` to Reviewer. Keep paper-repo `code/results/` — that is experiment
+   output Engineer captures from. By default Engineer runs only the plan’s concrete
+   `matrix` rows (fast). Set `ENGINEER_EXPAND_FULL_AXES=1` only when you intentionally want
+   the full `axes` cartesian product (paper-scale / multi-hour).
 

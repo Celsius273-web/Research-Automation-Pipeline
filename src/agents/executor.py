@@ -8,7 +8,7 @@ from pathlib import Path
 
 from src.config import EXECUTOR_TIMEOUT_SECONDS
 from src.state import EngineerOutput, ExecutorResult, MetricResult, RepoContext, RunAttempt
-from src.tools.docker_executor import DockerExecutor
+from src.tools.docker_executor import ContainerRunResult, DockerExecutor
 
 
 def _trim_log(text: str, max_lines: int = 50) -> str:
@@ -72,6 +72,15 @@ def _load_captured_metrics(repo_root: Path, results_path: str) -> tuple[list[Met
     return normalized, None
 
 
+def _dockerfile_for_language(project_root: Path, language: str) -> Path | None:
+    dockerfile_map = {
+        "python": project_root / "docker" / "python.Dockerfile",
+        "cpp": project_root / "docker" / "cpp.Dockerfile",
+        "rust": project_root / "docker" / "rust.Dockerfile",
+    }
+    return dockerfile_map.get(language)
+
+
 @dataclass
 class ExecutorAgent:
     project_root: Path
@@ -89,6 +98,31 @@ class ExecutorAgent:
                 continue
             target.write_text(patch.content, encoding="utf-8")
 
+    def run_container_command(
+        self,
+        repo_context: RepoContext,
+        command: str,
+        timeout_seconds: int = EXECUTOR_TIMEOUT_SECONDS,
+    ) -> ContainerRunResult:
+        """Run one shell command in a CPU-only container and return the raw result."""
+        language = repo_context.language or "unknown"
+        dockerfile = _dockerfile_for_language(self.project_root, language)
+        if dockerfile is None:
+            return ContainerRunResult(
+                stdout="",
+                stderr=f"Unsupported language '{language}'",
+                exit_code=1,
+                timed_out=False,
+                runtime_seconds=0.0,
+            )
+        image_tag = self.docker_executor.build_image(language=language, dockerfile_path=str(dockerfile))
+        return self.docker_executor.run_container(
+            image_tag=image_tag,
+            repo_path=repo_context.repo_path,
+            command=command,
+            timeout_seconds=timeout_seconds,
+        )
+
     def execute_step(
         self,
         paper_id: str,
@@ -100,12 +134,7 @@ class ExecutorAgent:
         timeout_seconds: int = EXECUTOR_TIMEOUT_SECONDS,
     ) -> ExecutorResult:
         language = repo_context.language or "unknown"
-        dockerfile_map = {
-            "python": self.project_root / "docker" / "python.Dockerfile",
-            "cpp": self.project_root / "docker" / "cpp.Dockerfile",
-            "rust": self.project_root / "docker" / "rust.Dockerfile",
-        }
-        dockerfile = dockerfile_map.get(language)
+        dockerfile = _dockerfile_for_language(self.project_root, language)
         if dockerfile is None:
             result = ExecutorResult(final_status="failed", total_attempts=current_attempt)
             result.attempts.append(

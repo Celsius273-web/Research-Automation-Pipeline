@@ -53,6 +53,7 @@ _SECTION_EXTRACTION_JSON_SCHEMA: dict = {
                 "type": "object",
                 "properties": {
                     "benchmark": {"type": "string"},
+                    "algorithm": {"type": "string"},
                     "metric_name": {"type": "string"},
                     "value": {"type": "string"},
                     "source": {"type": "string"},

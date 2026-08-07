@@ -19,7 +19,7 @@ logging.basicConfig(
 # Planner I/O goes to planner_debug.md; keep a single INFO line for that path.
 logging.getLogger("src.agents.planner").setLevel(logging.INFO)
 
-from src.config import EXTRACTIONS_DIR, MAX_RETRY_ATTEMPTS
+from src.config import EXTRACTIONS_DIR, MAX_RETRY_ATTEMPTS, ROOT_DIR
 from src.db import DatabaseError, get_paper_by_id
 from src.graphs.research_graph import (
     build_phase1_graph,
@@ -28,14 +28,17 @@ from src.graphs.research_graph import (
     build_phase4_graph,
 )
 from src.persistence import (
+    load_metrics_document,
     load_planner_envelope,
     load_reported_results,
     persist_extraction_bundle,
     persist_plan,
     persist_report,
+    persist_reviewer_run_report,
     persist_run_summary,
     resolve_extraction_path,
     resolve_plan_path,
+    resolve_run_dir,
     resolve_run_summary_path,
 )
 from src.planner_input import load_unified_planner_input
@@ -47,6 +50,7 @@ from src.pipeline_nodes import (
     make_planner_node,
     make_reviewer_node,
 )
+from src.agents.experiment_runner import ExperimentRunner
 from src.state import (
     AgentEnvelope,
     ExtractionBundle,
@@ -59,7 +63,9 @@ from src.state import (
     SectionExtraction,
     make_initial_state,
 )
+from src.tools.docker_executor import DockerExecutor
 from src.tools.language_detect import detect_language
+from src.tools.review_report import build_reviewer_run_report
 
 
 def slugify(value: str) -> str:
@@ -492,6 +498,74 @@ def run_review(run_path: str | None, paper_id: str | None, extraction_path: str 
     return 0
 
 
+def run_engineer(paper_id: str, non_interactive: bool, repo_path: str | None = None) -> int:
+    """Run plan-driven Engineer: execute phases via Docker and write metrics.json."""
+    _ = non_interactive  # Engineer has no interactive patch review in this path.
+    try:
+        runner = ExperimentRunner(docker_executor=DockerExecutor(project_root=ROOT_DIR))
+        metrics_doc, run_dir = runner.execute_paper(paper_id=paper_id, repo_path=repo_path)
+    except RuntimeError as exc:
+        print(str(exc))
+        return 1
+    except (FileNotFoundError, ValueError, json.JSONDecodeError) as exc:
+        print(f"Engineer failed: {exc}")
+        return 1
+    except ModuleNotFoundError as exc:
+        print(
+            f"Engineer failed: missing host package {exc.name!r}. "
+            f"Install project deps with: pip install -r requirements.txt"
+        )
+        return 1
+    except Exception as exc:
+        print(f"Engineer failed with unexpected error: {exc}")
+        return 1
+
+    print(f"Run directory: {run_dir}")
+    print(f"RUN_ID={run_dir.name}")
+    print(f"metrics.json status: {metrics_doc.run_status} exit_code={metrics_doc.exit_code}")
+    return 0 if metrics_doc.run_status in {"SUCCESS", "PARTIAL"} else 1
+
+
+def run_reviewer(
+    paper_id: str,
+    non_interactive: bool,
+    run_id: str,
+    extraction_path: str | None = None,
+) -> int:
+    """Compare extraction reported_results to Engineer metrics.json and write reviewer_report.json."""
+    _ = non_interactive
+    try:
+        resolved_run_dir = resolve_run_dir(paper_id=paper_id, run_id=run_id)
+        metrics_doc = load_metrics_document(resolved_run_dir)
+        resolved_extraction = resolve_extraction_path(
+            extraction_path=extraction_path,
+            paper_id=paper_id,
+        )
+        if not resolved_extraction.exists():
+            print(f"extraction.json not found: {resolved_extraction}")
+            return 1
+        reported = load_reported_results(resolved_extraction)
+        report = build_reviewer_run_report(
+            paper_id=paper_id,
+            reported_results=reported,
+            metrics_doc=metrics_doc,
+        )
+        report_path = persist_reviewer_run_report(
+            resolved_run_dir, report, paper_id=paper_id
+        )
+    except (FileNotFoundError, ValueError, json.JSONDecodeError) as exc:
+        print(f"Reviewer failed: {exc}")
+        return 1
+    except Exception as exc:
+        print(f"Reviewer failed with unexpected error: {exc}")
+        return 1
+
+    print(f"Reviewer report saved: {report_path}")
+    print(f"run_id={run_id} confidence={report.confidence} matched={len(report.metrics_matched)} missing={len(report.metrics_missing)}")
+    print(report.summary)
+    return 0
+
+
 def run_full_pipeline(paper_id: str, non_interactive: bool) -> int:
     """Run the complete pipeline: analyze -> plan -> execute -> review."""
     print(f"Starting full pipeline for paper: {paper_id}")
@@ -597,6 +671,35 @@ def build_parser() -> argparse.ArgumentParser:
     review.add_argument("--run-path", help="Path to run_summary.json")
     review.add_argument("--paper-id", help="Paper id to load data/runs/<paper_id>/run_summary.json")
     review.add_argument("--extraction-path", help="Optional extraction artifact path for reported results")
+
+    engineer = subparsers.add_parser(
+        "engineer",
+        help="Run plan-driven Engineer: execute plan phases in Docker and write metrics.json",
+    )
+    engineer.add_argument("--paper-id", required=True, help="Paper ID with an approved plan artifact")
+    engineer.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help="Log progress to stdout (no interactive prompts in this path).",
+    )
+    engineer.add_argument("--repo-path", help="Override repository path (defaults to ingested code/)")
+
+    reviewer = subparsers.add_parser(
+        "reviewer",
+        help="Compare extraction reported_results to Engineer metrics.json",
+    )
+    reviewer.add_argument("--paper-id", required=True, help="Paper ID with Engineer run artifacts")
+    reviewer.add_argument(
+        "--run-id",
+        required=True,
+        help="Run directory name under data/papers/{paper_id}/runs/ (R1, R2, …)",
+    )
+    reviewer.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help="Log progress to stdout (no interactive prompts in this path).",
+    )
+    reviewer.add_argument("--extraction-path", help="Optional extraction artifact path")
     return parser
 
 
@@ -640,6 +743,19 @@ def main() -> int:
             return run_review(
                 run_path=args.run_path,
                 paper_id=args.paper_id,
+                extraction_path=args.extraction_path,
+            )
+        if args.command == "engineer":
+            return run_engineer(
+                paper_id=args.paper_id,
+                non_interactive=args.non_interactive,
+                repo_path=args.repo_path,
+            )
+        if args.command == "reviewer":
+            return run_reviewer(
+                paper_id=args.paper_id,
+                non_interactive=args.non_interactive,
+                run_id=args.run_id,
                 extraction_path=args.extraction_path,
             )
         return 0

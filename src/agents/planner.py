@@ -24,6 +24,7 @@ from src.config import (
 from src.planner_input import build_planner_prompt_context, build_unified_planner_input
 from src.state import (
     AgentEnvelope,
+    PlanPhase,
     PlannerEnvelope,
     PlannerInputContext,
     PlannerPayload,
@@ -31,6 +32,11 @@ from src.state import (
     UnknownItem,
 )
 from src.tools.phase_builder import build_plan_phases, collect_surface_context_notes
+from src.tools.plan_venv_cleanup import (
+    VENV_PLAN_REWRITE_NOTE,
+    VENV_PLAN_REWRITE_WARNING,
+    cleanup_venv_patterns_in_phases,
+)
 from src.tools.repo_context import is_experiment_command
 from src.tools.plan_verification import verify_and_filter_phases
 from src.tools.results_paths import (
@@ -290,7 +296,13 @@ def _normalize_planner_payload(payload: dict[str, object]) -> dict[str, object]:
     phases = _normalize_phases(data.get("phases"))
     if not phases:
         phases = _legacy_steps_to_phases(data)
+    phases, venv_rewritten = cleanup_venv_patterns_in_phases(phases)
     data["phases"] = phases
+    if venv_rewritten:
+        missing = _ensure_list_str(data.get("missing_context"))
+        if VENV_PLAN_REWRITE_NOTE not in missing:
+            missing.append(VENV_PLAN_REWRITE_NOTE)
+        data["missing_context"] = missing
     data.pop("steps", None)
     data.pop("experiment_matrix", None)
     data["plan_summary"] = str(data.get("plan_summary", "")).strip()
@@ -305,6 +317,13 @@ def _normalize_envelope_dict(parsed: dict[str, object]) -> dict[str, object]:
     payload = data.get("payload")
     if isinstance(payload, dict):
         data["payload"] = _normalize_planner_payload(payload)
+        missing = data["payload"].get("missing_context") or []
+        if VENV_PLAN_REWRITE_NOTE in missing:
+            warnings = _ensure_list_str(data.get("warnings"))
+            if VENV_PLAN_REWRITE_WARNING not in warnings:
+                warnings.append(VENV_PLAN_REWRITE_WARNING)
+                logger.warning("%s", VENV_PLAN_REWRITE_WARNING)
+            data["warnings"] = warnings
     return data
 
 
@@ -804,6 +823,76 @@ def _apply_results_contract(
     return envelope.model_copy(update={"payload": payload})
 
 
+_RESULTS_SUMMARY_FEASIBILITY_NOTE = (
+    "results_summary_path assumes repo creates summary.json; if not, Engineer will report "
+    "0 metrics captured unless per-row result artifacts under matrix results_path are readable."
+)
+
+
+def _repo_documents_summary_json(repo_path: Path) -> bool:
+    """Heuristic: README/docs mention writing summary.json."""
+    for name in ("README.md", "README.rst", "README.txt", "README"):
+        readme = repo_path / name
+        if not readme.is_file():
+            continue
+        try:
+            text = readme.read_text(encoding="utf-8", errors="ignore").lower()
+        except OSError:
+            continue
+        if "summary.json" in text:
+            return True
+    return False
+
+
+def _annotate_results_summary_feasibility(
+    envelope: AgentEnvelope[PlannerPayload],
+    paper_id: str,
+    repo_path: str | Path | None,
+) -> AgentEnvelope[PlannerPayload]:
+    """Warn when results_summary_path is the contract placeholder without repo evidence."""
+    expected = results_summary_relpath(paper_id)
+    summary_path = envelope.payload.results_summary_path.strip() or expected
+    if summary_path != expected and not summary_path.endswith("summary.json"):
+        return envelope
+
+    missing = list(envelope.payload.missing_context)
+    warnings = list(envelope.warnings)
+    if repo_path:
+        root = Path(repo_path)
+        on_disk = (root / expected).is_file()
+        if on_disk or _repo_documents_summary_json(root):
+            return envelope
+
+    if _RESULTS_SUMMARY_FEASIBILITY_NOTE not in missing:
+        missing.append(_RESULTS_SUMMARY_FEASIBILITY_NOTE)
+    note = f"results_summary_path feasibility unchecked or undocumented for {expected}"
+    if note not in warnings:
+        warnings.append(note)
+    payload = envelope.payload.model_copy(update={"missing_context": missing})
+    return envelope.model_copy(update={"payload": payload, "warnings": warnings})
+
+
+def _apply_venv_command_cleanup(
+    envelope: AgentEnvelope[PlannerPayload],
+) -> AgentEnvelope[PlannerPayload]:
+    """Strip venv-in-plan patterns after scaffold/verification rebuilds phases."""
+    raw_phases = [phase.model_dump() for phase in envelope.payload.phases]
+    cleaned, changed = cleanup_venv_patterns_in_phases(raw_phases)
+    if not changed:
+        return envelope
+
+    phases = [PlanPhase.model_validate(phase) for phase in cleaned]
+    missing = list(envelope.payload.missing_context)
+    warnings = list(envelope.warnings)
+    if VENV_PLAN_REWRITE_NOTE not in missing:
+        missing.append(VENV_PLAN_REWRITE_NOTE)
+    if VENV_PLAN_REWRITE_WARNING not in warnings:
+        warnings.append(VENV_PLAN_REWRITE_WARNING)
+        logger.warning("%s", VENV_PLAN_REWRITE_WARNING)
+    payload = envelope.payload.model_copy(update={"phases": phases, "missing_context": missing})
+    return envelope.model_copy(update={"payload": payload, "warnings": warnings})
+
+
 def _mark_partial_with_grounding(
     envelope: AgentEnvelope[PlannerPayload],
     issues: list[str],
@@ -1222,6 +1311,15 @@ class PaperPlanner:
                         ),
                     )
                     envelope = _apply_results_contract(envelope, paper_id)
+                    resolved_repo = repo_path or (
+                        repo_exploration.get("repo_path")
+                        if isinstance(repo_exploration, dict)
+                        else None
+                    )
+                    envelope = _annotate_results_summary_feasibility(
+                        envelope, paper_id, resolved_repo
+                    )
+                    envelope = _apply_venv_command_cleanup(envelope)
                     attempt.outcome = "accepted"
                     trace.final_output = envelope.model_dump()
                     return envelope

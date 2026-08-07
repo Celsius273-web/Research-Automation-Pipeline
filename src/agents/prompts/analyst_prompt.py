@@ -72,15 +72,21 @@ Reported Result Extraction Rules (critical for reproduction):
 - Extract concrete quantitative outcomes into reported_results. Prefer numbers from tables and
   inline claims (e.g., "0.72 NMI", "regret 0.12", "2.6389E+02").
 - Each entry MUST include:
-  - benchmark: dataset / function / problem name
-  - metric_name: exact metric name (NMI, ARI, regret, objective value, runtime, ...)
+  - benchmark: short problem/dataset ID when known from code/registry (e.g. "3bar", "lsq"),
+    otherwise the paper's problem name
+  - algorithm: method that produced the number when the table/row names it (e.g. "be-cbo",
+    "CEI"); use "" only when the paper does not attribute a method
+  - metric_name: exact metric label from the paper (prefer "f(x*)", "regret", "NMI", "runtime")
   - value: the actual number or short quantitative string containing a digit (never empty)
   - source: "Table 3", "Figure 5", "abstract", or "text"
 - Do NOT emit placeholder rows that only cite a table/figure without copying the value
   (bad: value="" or value="see Table 4").
 - Do NOT emit qualitative figure descriptions without numbers
-  (bad: "successfully outperforms baselines").
-- If a table has multiple rows/metrics, emit one reported_results entry per row/metric.
+  (bad: "successfully outperforms baselines", "highly accurate boundary classification").
+- Prefer table rows that Engineer can reproduce (objective / regret / runtime scalars) over
+  prose summaries of figures.
+- If a table has multiple rows/metrics/methods, emit one reported_results entry per
+  (benchmark, algorithm, metric) cell.
 - If this section has no quantitative outcomes, use an empty reported_results list.
 - Skip OCR/figure digitization; if a figure has no numeric caption/text, omit it.
 
@@ -101,6 +107,7 @@ Output JSON Schema (flat SectionExtraction — no envelope, no nesting):
   "reported_results": [
     {{
       "benchmark": "string",
+      "algorithm": "string",
       "metric_name": "string",
       "value": "string",
       "source": "string"
@@ -159,13 +166,15 @@ Worked Example (experiments section with table numbers + matrix datasets):
   "reported_results": [
     {{
       "benchmark": "Cora",
+      "algorithm": "",
       "metric_name": "NMI",
       "value": "0.72",
       "source": "Table 3"
     }},
     {{
-      "benchmark": "Townsend Function (2D)",
-      "metric_name": "objective value",
+      "benchmark": "3bar",
+      "algorithm": "be-cbo",
+      "metric_name": "f(x*)",
       "value": "2.6389E+02",
       "source": "Table 1"
     }}

@@ -1,7 +1,8 @@
 """Deterministic phase-DAG builder for Planner plans.
 
-Builds compact axes + a few example matrix rows from repo exploration and
-Analyst hyperparameter lists. Full cartesian expansion is left to Executor.
+Builds compact axes + a few concrete matrix rows from repo exploration and
+Analyst hyperparameter lists. Engineer runs matrix rows by default; optional
+full cartesian expansion is gated by ENGINEER_EXPAND_FULL_AXES.
 """
 
 from __future__ import annotations
