@@ -275,6 +275,15 @@ class ExperimentRunner:
                 f"Attempt {attempt} exit_code={result.exit_code} timed_out={result.timed_out} "
                 f"runtime={result.runtime_seconds:.2f}s",
             )
+            if result.exit_code != 0:
+                print(f"\n{'='*70}")
+                print(f"FAILED ATTEMPT {attempt}/{self.max_attempts}: {step_id}")
+                print(f"{'='*70}")
+                if result.stdout:
+                    print(f"STDOUT:\n{result.stdout}")
+                if result.stderr:
+                    print(f"STDERR:\n{result.stderr}")
+                print(f"{'='*70}\n")
             metrics_doc.exit_code = result.exit_code if not result.timed_out else 124
             self._persist_metrics(metrics_path, metrics_doc)
             if result.exit_code == 0 and not result.timed_out:
