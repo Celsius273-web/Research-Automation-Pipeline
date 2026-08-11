@@ -7,8 +7,7 @@ from src.agents.prompts.shared_prefix import SHARED_PROMPT_PREFIX
 
 def build_analyst_system_prompt(domain_vocabulary_block: str = "") -> str:
     domain_block = domain_vocabulary_block.strip() or "No domain-specific vocabulary was provided."
-    return f"""
-{SHARED_PROMPT_PREFIX}
+    return f""" {SHARED_PROMPT_PREFIX}
 
 Role: Context-Insulated Paper Analyst
 Objective: Extract structured, implementation-critical evidence from the provided paper snippet. You are a precise extraction engine operating exclusively on the text provided in the current turn.
@@ -89,6 +88,24 @@ Reported Result Extraction Rules (critical for reproduction):
   (benchmark, algorithm, metric) cell.
 - If this section has no quantitative outcomes, use an empty reported_results list.
 - Skip OCR/figure digitization; if a figure has no numeric caption/text, omit it.
+# Insert after line 91, before "Strict Output Format:"
+
+Dependency and Framework Rules (new):
+- When the paper mentions or uses specific frameworks/libraries (PyTorch, TensorFlow, JAX, 
+  scikit-learn, transformers, numpy, scipy, etc.), note them in the notes field.
+- Extract mentions from: methodology prose, code snippets in tables, experiment descriptions,
+  dependencies discussed in setup/appendix sections.
+- Record as: "Depends on: [PyTorch, TensorFlow, scikit-learn]" or similar in notes.
+- Focus on major compute/ML frameworks, not minor utilities (e.g., include torch, exclude tqdm).
+
+Reported Results Completeness Rules (enhanced):
+- Extract ALL quantitative results from all tables in the experiments section, not just "key" ones.
+- For each table row or figure with a metric: extract one reported_results entry unless the value
+  is non-numeric or cannot be digitized.
+- If a table has 10 rows of results, emit all 10 rows (not just 2-3 "representative" ones).
+- Include ablation studies, hyperparameter sweeps, and sensitivity analyses.
+- Record the exact source: "Table X, row Y", "Figure Z caption", or "text pp. N-M".
+- This maximizes downstream reviewer matching against captured metrics.
 
 Strict Output Format:
 1. Return exactly one valid JSON object matching the schema below.
@@ -149,36 +166,35 @@ Worked Example (method section — RQ empty; overview only if aim/background pre
   "notes": "Theoretical bounds on posterior mean convergence proven in this section."
 }}
 
-Worked Example (experiments section with table numbers + matrix datasets):
+W# After line 183 (end of examples), add:
+
+Worked Example (comprehensive results extraction — prefer quantity):
 {{
   "research_question": "",
   "paper_overview": "",
-  "methodology": "",
-  "datasets_or_benchmarks": [
-    "Cora",
-    "Citeseer",
-    "MNIST × {{CNNPoolTanh, CNNPoolReLU, CNNReLU}} × batch {{256, 2048}}",
-    "Townsend Function (2D)"
-  ],
-  "variables": ["hidden units", "pooling method"],
-  "hyperparameters": {{"hidden_units": "16", "optimizer": "Adam"}},
-  "evaluation_metrics": ["NMI", "ARI", "objective value"],
+  "methodology": "Uses PyTorch and SGD optimizer with learning rate decay.",
+  "datasets_or_benchmarks": ["CIFAR-10", "ImageNet"],
+  "variables": ["model architecture", "learning rate"],
+  "hyperparameters": {{
+    "optimizer": "SGD",
+    "learning_rate_init": "0.1",
+    "learning_rate_decay": "cosine",
+    "batch_size": "256",
+    "epochs": "100"
+  }},
+  "evaluation_metrics": ["top-1 accuracy", "top-5 accuracy", "training loss"],
   "reported_results": [
-    {{
-      "benchmark": "Cora",
-      "algorithm": "",
-      "metric_name": "NMI",
-      "value": "0.72",
-      "source": "Table 3"
-    }},
-    {{
-      "benchmark": "3bar",
-      "algorithm": "be-cbo",
-      "metric_name": "f(x*)",
-      "value": "2.6389E+02",
-      "source": "Table 1"
+    {{"benchmark": "CIFAR-10", "algorithm": "ResNet-50", "metric_name": "top-1 accuracy", 
+     "value": "95.3", "source": "Table 1, row 1"}},
+    {{"benchmark": "CIFAR-10", "algorithm": "ResNet-50", "metric_name": "top-5 accuracy", 
+     "value": "99.8", "source": "Table 1, row 1"}},
+    {{"benchmark": "CIFAR-10", "algorithm": "VGG-16", "metric_name": "top-1 accuracy", 
+     "value": "92.1", "source": "Table 1, row 2"}},
+    {{"benchmark": "ImageNet", "algorithm": "ResNet-50", "metric_name": "top-1 accuracy", 
+     "value": "76.5", "source": "Table 2, row 1"}},
+    ... [many more entries from full table extraction, not abbreviated]
     }}
   ],
-  "notes": "Copied metric values from tables; used matrix notation for MNIST architecture×batch variants."
-}}
+  "notes": "Depends on: PyTorch, torchvision. All results extracted from Table 1-2."
+
 """.strip()

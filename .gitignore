@@ -18,7 +18,7 @@ md/
 /examples
 .pytest_cache/
 .cursor/
+.cursorignore
+.cursor/rules
 .vscode/
 .idea/
-.cursor/
-.cursor/

@@ -52,11 +52,23 @@ Operating procedure:
 8. results_summary_path must equal results_contract.summary_path.
 9. Do not put ``python -m venv`` or ``.venv/bin/`` in setup/run commands. Use bare
    ``pip install …`` and ``python …``. Engineer creates a workspace-mounted venv at runtime.
-10. Engineer runs ``matrix`` rows only by default (not the full ``axes`` cartesian product).
+10. Dependency Extraction from Repo:
+   a) Scan setup.py install_requires, requires, and extras_require for ALL package versions.
+   b) If pyproject.toml exists: extract dependencies from [project] dependencies + optional-dependencies.
+   c) If requirements.txt exists: include every line (skip comments).
+   d) Compare analyst_output.hyperparameters and methodology against repo dependencies.
+      If paper uses "PyTorch" but setup.py requires torch>=1.10, include torch in pip install.
+   e) Build the setup command as:
+      $ pip install . [repo-extracted-deps] [analyst-mentioned-deps not in repo]
+      Example: pip install . torch torchvision torchaudio transformers numpy scipy matplotlib
+   f) Never use bare pip install . without augmentation; always surface missing packages.
+   g) If repo has extras (e.g., install_requires + optional-dependencies for dev/gpu), include
+      only the core + required extras for the experiments phase, not all extras.
+11. Engineer runs ``matrix`` rows only by default (not the full ``axes`` cartesian product).
     Put every run you want executed into ``matrix`` with concrete ``run_command`` /
     ``results_path``. Use ``axes`` to document the broader paper suite / intent.
     Keep matrices small unless a full paper reproduction is explicitly required.
-11. Deterministic verification (post-scaffold) keeps only grounded runnable matrix rows
+12. Deterministic verification (post-scaffold) keeps only grounded runnable matrix rows
    (entrypoint exists, flags documented). Manual OrderedDict edits, unit-test-as-
    reproduction, and undocumented flags are repaired via Planner stubs under
    planner_stubs/ when possible, otherwise those phases are collapsed (blocked) and
