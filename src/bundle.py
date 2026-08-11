@@ -227,6 +227,30 @@ class PaperBundle:
         
         self.report_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
 
+    def get_dependency_files(self) -> list[str]:
+        """Find all dependency configuration files (setup.py, requirements.txt, pyproject.toml)."""
+        if not self.has_code():
+            return []
+        
+        dependency_files = []
+        patterns = ["setup.py", "requirements.txt", "pyproject.toml", "setup.cfg", "Pipfile"]
+        
+        # Root level files
+        for pattern in patterns:
+            path = self.code_dir / pattern
+            if path.exists():
+                dependency_files.append(str(path.relative_to(self.code_dir)))
+        
+        # Subdirectory files (e.g., HEBO/requirements.txt)
+        for subdir in self.code_dir.iterdir():
+            if subdir.is_dir() and not subdir.name.startswith("."):
+                for pattern in patterns:
+                    path = subdir / pattern
+                    if path.exists():
+                        dependency_files.append(str(path.relative_to(self.code_dir)))
+        
+        return sorted(list(set(dependency_files)))
+
     def get_hyperparameter_reference(self) -> str:
         """Extract hyperparameter tables from the extraction."""
         extraction = self.get_extraction()

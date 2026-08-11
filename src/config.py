@@ -97,7 +97,7 @@ PLANNER_MAKE_TARGETS_MAX = int(os.getenv("PLANNER_MAKE_TARGETS_MAX", "12"))
 # Legacy candidate caps kept for exploration helpers.
 PLANNER_MATRIX_CANDIDATE_MAX = int(os.getenv("PLANNER_MATRIX_CANDIDATE_MAX", "12"))
 PLANNER_MATRIX_MAX_FUNCTIONS = int(os.getenv("PLANNER_MATRIX_MAX_FUNCTIONS", "6"))
-PLANNER_MATRIX_MAX_ALGORITHMS = int(os.getenv("PLANNER_MATRIX_MAX_ALGORITHMS", "3"))
+PLANNER_MATRIX_MAX_ALGORITHMS = int(os.getenv("PLANNER_MATRIX_MAX_ALGORITHMS", "5"))
 PLANNER_MIN_MATRIX_ROWS = int(os.getenv("PLANNER_MIN_MATRIX_ROWS", "6"))
 # Planner-generated wrapper/driver stubs live under <paper_bundle>/planner_stubs/.
 PLANNER_STUBS_DIRNAME = os.getenv("PLANNER_STUBS_DIRNAME", "planner_stubs")
@@ -105,7 +105,7 @@ PLANNER_STUB_EXAMPLE_ROWS = int(os.getenv("PLANNER_STUB_EXAMPLE_ROWS", "4"))
 
 # Default off: Engineer runs plan matrix rows only (fast). Set ENGINEER_EXPAND_FULL_AXES=1
 # to expand phase.axes into the full cartesian product (paper-scale suites).
-ENGINEER_EXPAND_FULL_AXES = os.getenv("ENGINEER_EXPAND_FULL_AXES", "0").strip().lower() in {
+ENGINEER_EXPAND_FULL_AXES = os.getenv("ENGINEER_EXPAND_FULL_AXES", "1").strip().lower() in {
     "1",
     "true",
     "yes",

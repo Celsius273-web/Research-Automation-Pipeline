@@ -143,6 +143,9 @@ def _build_repo_context(context: PlannerInputContext) -> PlannerRepoContext:
     entrypoint_hints = repo.get("entrypoint_hints") or []
     if not isinstance(entrypoint_hints, list):
         entrypoint_hints = []
+    dependency_files = repo.get("dependency_files") or []
+    if not isinstance(dependency_files, list):
+        dependency_files = []
     return PlannerRepoContext(
         url=str(repo.get("url") or repo.get("repo_url") or ""),
         language=language,
@@ -153,6 +156,7 @@ def _build_repo_context(context: PlannerInputContext) -> PlannerRepoContext:
         readme_summary=str(repo.get("readme_summary") or context.repo_setup_guide or "No README"),
         example_commands=[str(item).strip() for item in example_commands if str(item).strip()],
         entrypoint_hints=[str(item).strip() for item in entrypoint_hints if str(item).strip()],
+        dependency_files=[str(item).strip() for item in dependency_files if str(item).strip()],
     )
 
 

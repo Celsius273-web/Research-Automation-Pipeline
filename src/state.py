@@ -149,6 +149,7 @@ class PlannerRepoContext(BaseModel):
     readme_summary: str
     example_commands: list[str] = Field(default_factory=list)
     entrypoint_hints: list[str] = Field(default_factory=list)
+    dependency_files: list[str] = Field(default_factory=list)
 
 
 class PlannerFlags(BaseModel):

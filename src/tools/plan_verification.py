@@ -31,6 +31,63 @@ _FLAG_IN_COMMAND_RE = re.compile(r"--([A-Za-z0-9-]+)(?:\s|=|$)")
 _TEST_MODULE_RE = re.compile(r"(?:^|/)(?:test_[^/]+|[^/]+_test)\.py$", re.IGNORECASE)
 
 
+def _validate_setup_commands(phases: list[PlanPhase], repo_path: Path | None = None) -> list[str]:
+    """Check setup phase commands for missing files (requirements.txt, setup.py).
+    
+    Returns list of warnings if issues found.
+    """
+    warnings: list[str] = []
+    if not repo_path:
+        return warnings
+    
+    for phase in phases:
+        if phase.phase_id != "setup":
+            continue
+        
+        # Check run_template and matrix rows
+        all_commands = [phase.run_template] if phase.run_template else []
+        all_commands.extend(row.run_command for row in phase.matrix if row.run_command)
+        
+        for cmd in all_commands:
+            if not cmd.strip():
+                continue
+            
+            # Check for requirements.txt or setup.py references
+            if "requirements.txt" in cmd:
+                # Verify the file exists (check root and subdirs)
+                req_candidates = [
+                    repo_path / "requirements.txt",
+                ]
+                # Also check common subdirs
+                if repo_path.is_dir():
+                    for subdir in repo_path.iterdir():
+                        if subdir.is_dir() and not subdir.name.startswith("."):
+                            req_candidates.append(subdir / "requirements.txt")
+                
+                if not any(p.exists() for p in req_candidates):
+                    warnings.append(
+                        f"setup phase references 'requirements.txt' but file not found at root "
+                        f"or in subdirectories. Use explicit path or inline deps: {cmd[:80]}..."
+                    )
+            
+            if "setup.py" in cmd and not (repo_path / "setup.py").exists():
+                # Check subdirs
+                found = False
+                if repo_path.is_dir():
+                    for subdir in repo_path.iterdir():
+                        if (subdir / "setup.py").exists():
+                            found = True
+                            break
+                if not found:
+                    warnings.append(
+                        f"setup phase references 'setup.py' but file not found. "
+                        f"Use explicit path or pip install -e . at correct location: {cmd[:80]}..."
+                    )
+    
+    return warnings
+
+
+
 def _unique(values: list[str]) -> list[str]:
     out: list[str] = []
     seen: set[str] = set()
@@ -458,6 +515,9 @@ def verify_and_filter_phases(
         root = None
     exploration = exploration if isinstance(exploration, dict) else {}
 
+    # Validate setup phase commands
+    setup_warnings = _validate_setup_commands(phases, repo_path=root)
+    
     working = ensure_native_dependency_checks(
         list(phases), paper_id=paper_id, exploration=exploration
     )
@@ -466,7 +526,7 @@ def verify_and_filter_phases(
     )
 
     missing: list[str] = []
-    warnings: list[str] = []
+    warnings: list[str] = setup_warnings
     revised: list[PlanPhase] = []
     demoted = 0
     kept = 0

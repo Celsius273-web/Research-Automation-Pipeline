@@ -86,12 +86,14 @@ def make_planner_node(
                 return state
 
             repo_context = paper_bundle.get_repo_info()
+            repo_context_dict = repo_context.model_dump()
+            repo_context_dict["dependency_files"] = paper_bundle.get_dependency_files()
             context = PlannerInputContext(
                 paper=paper,
                 approved_extraction=extraction.merged,
                 extraction_sections=extraction.by_section,
                 runtime_constraints=default_runtime_constraints(),
-                repo_context=repo_context.model_dump(),
+                repo_context=repo_context_dict,
                 repo_setup_guide=paper_bundle.get_setup_guide(),
                 hyperparameter_reference=paper_bundle.get_hyperparameter_reference(),
                 extraction_file_path=str(paper_bundle.extraction_path),
