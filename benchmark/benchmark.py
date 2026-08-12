@@ -13,13 +13,19 @@ import os
 
 # --- Test Functions ---
 def sphere(x):
+    x = np.asarray(x)
+    x = np.asarray(x)
     return np.sum(x**2)
 
 def rastrigin(x):
+    x = np.asarray(x)
+    x = np.asarray(x)
     n = len(x)
     return 10 * n + np.sum(x**2 - 10 * np.cos(2 * np.pi * x))
 
 def ackley_2d(x):
+    x = np.asarray(x)
+    x = np.asarray(x)
     if len(x) != 2:
         raise ValueError("Ackley function is implemented for 2 dimensions only.")
     return ackley(x)
@@ -29,6 +35,8 @@ def rosenbrock(x):
     return np.sum(100.0 * (x[1:] - x[:-1]**2.0)**2.0 + (1 - x[:-1])**2.0)
 
 def griewank(x):
+    x = np.asarray(x)
+    x = np.asarray(x).flatten()
     s = np.sum(x**2 / 4000)
     p = np.prod(np.cos(x / np.sqrt(np.arange(1, len(x) + 1))))
     return s - p + 1
@@ -120,9 +128,11 @@ if __name__ == "__main__":
                         help="Random seed for reproducibility.")
     parser.add_argument("--n_iter", type=int, default=50,
                         help="Number of iterations/evaluations.")
-    parser.add_argument("--out", type=str, required=True,
-                        help="Path to output JSON file.")
-
     args = parser.parse_args()
 
-    run_benchmark(args.func, args.optimizer, args.seed, args.n_iter, args.out)
+    # Construct the output path
+    output_dir = "results/synthetic_benchmark"
+    output_filename = f"{args.func}_{args.optimizer}_s{args.seed}.json"
+    out_path = os.path.join(output_dir, output_filename)
+
+    run_benchmark(args.func, args.optimizer, args.seed, args.n_iter, out_path)
