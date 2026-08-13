@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import json
+
 from src.config import REVIEW_CLOSE_TOLERANCE_PCT, REVIEW_MATCH_TOLERANCE_PCT
 from src.state import (
     CapturedMetric,
+    ComparisonRow,
     MatchedMetricRow,
     MetricsDocument,
     MissingMetricRow,
@@ -17,31 +20,31 @@ from src.tools.metric_aliases import (
     canonicalize_benchmark,
     canonicalize_metric,
 )
-from src.tools.result_comparator import parse_leading_number
-
-
-def _coerce_numeric(value: float | str | object) -> float | None:
-    if isinstance(value, bool):
-        return None
-    if isinstance(value, (int, float)):
-        return float(value)
-    return parse_leading_number(str(value))
+from src.tools.result_comparator import (
+    coerce_numeric,
+    compare_metric_values,
+    parse_mapping,
+    parse_sequence,
+)
 
 
 def _display_value(value: float | str | object) -> float | str:
-    numeric = _coerce_numeric(value)
+    if parse_sequence(value) is not None or parse_mapping(value) is not None:
+        if isinstance(value, (list, dict, tuple)):
+            return json.dumps(value)
+        return str(value).strip()
+    numeric = coerce_numeric(value)
     if numeric is not None:
         return numeric
     return str(value).strip()
 
 
-def _match_status(delta_pct: float) -> str:
-    abs_delta = abs(delta_pct)
-    if abs_delta < REVIEW_MATCH_TOLERANCE_PCT:
-        return "match"
-    if abs_delta < REVIEW_CLOSE_TOLERANCE_PCT:
-        return "close"
-    return "diverged"
+def _pair_key(benchmark: str, algorithm: str, metric_name: str) -> tuple[str, str, str]:
+    return (
+        canonicalize_benchmark(benchmark),
+        canonicalize_algorithm(algorithm),
+        canonicalize_metric(metric_name),
+    )
 
 
 def _capture_bucket_key(item: CapturedMetric) -> tuple[str, str]:
@@ -50,12 +53,15 @@ def _capture_bucket_key(item: CapturedMetric) -> tuple[str, str]:
 
 def _index_captured(
     metrics: list[CapturedMetric],
-) -> dict[tuple[str, str], list[CapturedMetric]]:
-    indexed: dict[tuple[str, str], list[CapturedMetric]] = {}
+) -> tuple[dict[tuple[str, str, str], list[CapturedMetric]], dict[tuple[str, str], list[CapturedMetric]]]:
+    by_triple: dict[tuple[str, str, str], list[CapturedMetric]] = {}
+    by_pair: dict[tuple[str, str], list[CapturedMetric]] = {}
     for item in metrics:
-        key = _capture_bucket_key(item)
-        indexed.setdefault(key, []).append(item)
-    return indexed
+        triple = _pair_key(item.benchmark, item.algorithm, item.metric_name)
+        pair = _capture_bucket_key(item)
+        by_triple.setdefault(triple, []).append(item)
+        by_pair.setdefault(pair, []).append(item)
+    return by_triple, by_pair
 
 
 def _pick_captured(
@@ -78,12 +84,26 @@ def _pick_captured(
         if canonicalize_algorithm(item.algorithm) in preferred:
             return item
 
-    # Fall back to first stable order: prefer non-empty algorithm, then name.
     ranked = sorted(
         candidates,
         key=lambda item: (0 if item.algorithm.strip() else 1, item.algorithm, item.source),
     )
     return ranked[0]
+
+
+def _resolve_captured(
+    reported: ReportedResult,
+    by_triple: dict[tuple[str, str, str], list[CapturedMetric]],
+    by_pair: dict[tuple[str, str], list[CapturedMetric]],
+) -> CapturedMetric | None:
+    triple = _pair_key(reported.benchmark, reported.algorithm, reported.metric_name)
+    if reported.algorithm.strip() and triple in by_triple:
+        return _pick_captured(by_triple[triple], reported.algorithm)
+    pair = (
+        canonicalize_benchmark(reported.benchmark),
+        canonicalize_metric(reported.metric_name),
+    )
+    return _pick_captured(by_pair.get(pair, []), reported.algorithm)
 
 
 def assign_confidence(
@@ -96,11 +116,7 @@ def assign_confidence(
     if reported_count <= 0:
         return "LOW" if run_status == "FAILED" else "MEDIUM"
 
-    comparable = [
-        row
-        for row in matched_rows
-        if row.delta_pct is not None
-    ]
+    comparable = [row for row in matched_rows if row.delta_pct is not None]
     capture_ratio = len(comparable) / reported_count if reported_count else 0.0
     deltas = [abs(row.delta_pct or 0.0) for row in comparable]
     all_match = bool(deltas) and all(delta < REVIEW_MATCH_TOLERANCE_PCT for delta in deltas)
@@ -133,6 +149,8 @@ def _build_gaps(
     if metrics_doc.phases_failed:
         gaps.append("some phases failed")
     for item in missing:
+        if item.reason == "missing_reported":
+            continue
         label = f"{item.metric_name}" + (f" on {item.benchmark}" if item.benchmark else "")
         gaps.append(f"{label} not captured")
     for item in reported:
@@ -158,9 +176,7 @@ def _build_summary(
     comparable = [row for row in matched if row.delta_pct is not None]
     parts = [f"{len(comparable)} of {reported_count} metrics compared ({captured_count} captured)."]
     if comparable:
-        close_or_better = [
-            row for row in comparable if row.match_status in {"match", "close"}
-        ]
+        close_or_better = [row for row in comparable if row.match_status in {"match", "close"}]
         if close_or_better:
             worst = max(abs(row.delta_pct or 0.0) for row in close_or_better)
             parts.append(f"Matched metrics within {worst:.0f}%.")
@@ -174,22 +190,80 @@ def _build_summary(
     return " ".join(parts)
 
 
-def build_reviewer_run_report(
-    paper_id: str,
+def _to_comparison_row(
+    *,
+    metric_name: str,
+    benchmark: str,
+    algorithm: str,
+    reported_value: object,
+    captured_value: object,
+    match_status: str,
+    delta_pct: float | None,
+    absolute_diff: float | None,
+) -> ComparisonRow:
+    return ComparisonRow(
+        metric_name=metric_name,
+        benchmark=benchmark,
+        algorithm=algorithm,
+        reported_value="" if reported_value is None else str(_display_value(reported_value)),
+        reproduced_value="" if captured_value is None else str(_display_value(captured_value)),
+        absolute_difference=absolute_diff,
+        relative_difference_pct=None if delta_pct is None else abs(delta_pct),
+        match_status=match_status,  # type: ignore[arg-type]
+    )
+
+
+def _append_matched(
+    matched: list[MatchedMetricRow],
+    table: list[ComparisonRow],
+    reported: ReportedResult,
+    captured: CapturedMetric,
+) -> None:
+    status, delta_pct, abs_diff = compare_metric_values(reported.value, captured.value)
+    if status == "unparsable":
+        status = "diverged"
+    if status in {"missing_captured", "missing_reported"}:
+        status = "diverged"
+    algorithm = captured.algorithm or reported.algorithm
+    matched.append(
+        MatchedMetricRow(
+            metric_name=reported.metric_name,
+            benchmark=reported.benchmark,
+            algorithm=algorithm,
+            reported_value=_display_value(reported.value),
+            captured_value=_display_value(captured.value),
+            delta_pct=delta_pct,
+            match_status=status,  # type: ignore[arg-type]
+        )
+    )
+    table.append(
+        _to_comparison_row(
+            metric_name=reported.metric_name,
+            benchmark=reported.benchmark,
+            algorithm=algorithm,
+            reported_value=reported.value,
+            captured_value=captured.value,
+            match_status=status,
+            delta_pct=delta_pct,
+            absolute_diff=abs_diff,
+        )
+    )
+
+
+def _record_reported_rows(
     reported_results: list[ReportedResult],
-    metrics_doc: MetricsDocument,
-) -> ReviewerRunReport:
-    """Compare Analyst reported_results to Engineer metrics.json without assigning pass/fail."""
-    captured_index = _index_captured(metrics_doc.metrics)
+    by_triple: dict[tuple[str, str, str], list[CapturedMetric]],
+    by_pair: dict[tuple[str, str], list[CapturedMetric]],
+) -> tuple[list[MatchedMetricRow], list[MissingMetricRow], list[ComparisonRow], set[int]]:
     matched: list[MatchedMetricRow] = []
     missing: list[MissingMetricRow] = []
-
+    table: list[ComparisonRow] = []
+    used_ids: set[int] = set()
     for reported in reported_results:
         key = (
             canonicalize_benchmark(reported.benchmark),
             canonicalize_metric(reported.metric_name),
         )
-        # Skip non-comparable qualitative / unmapped metric labels (no alias, no digit-ready name).
         if not key[0] or not key[1]:
             missing.append(
                 MissingMetricRow(
@@ -200,43 +274,76 @@ def build_reviewer_run_report(
                 )
             )
             continue
-
-        candidates = captured_index.get(key, [])
-        captured = _pick_captured(candidates, reported.algorithm)
+        captured = _resolve_captured(reported, by_triple, by_pair)
         if captured is None:
             missing.append(
                 MissingMetricRow(
                     metric_name=reported.metric_name,
                     benchmark=reported.benchmark,
                     algorithm=reported.algorithm,
-                    reason="not_captured",
+                    reason="missing_captured",
+                )
+            )
+            table.append(
+                _to_comparison_row(
+                    metric_name=reported.metric_name,
+                    benchmark=reported.benchmark,
+                    algorithm=reported.algorithm,
+                    reported_value=reported.value,
+                    captured_value="",
+                    match_status="missing_captured",
+                    delta_pct=None,
+                    absolute_diff=None,
                 )
             )
             continue
+        used_ids.add(id(captured))
+        _append_matched(matched, table, reported, captured)
+    return matched, missing, table, used_ids
 
-        reported_num = _coerce_numeric(reported.value)
-        captured_num = _coerce_numeric(captured.value)
-        delta_pct: float | None = None
-        status = "diverged"
-        if reported_num is not None and captured_num is not None:
-            if reported_num == 0:
-                delta_pct = 0.0 if captured_num == 0 else 100.0
-            else:
-                delta_pct = ((captured_num - reported_num) / reported_num) * 100.0
-            status = _match_status(delta_pct)
 
-        matched.append(
-            MatchedMetricRow(
-                metric_name=reported.metric_name,
-                benchmark=reported.benchmark,
-                algorithm=captured.algorithm or reported.algorithm,
-                reported_value=_display_value(reported.value),
-                captured_value=_display_value(captured.value),
-                delta_pct=delta_pct,
-                match_status=status,  # type: ignore[arg-type]
+def _record_unmatched_captured(
+    metrics: list[CapturedMetric],
+    used_ids: set[int],
+    missing: list[MissingMetricRow],
+    table: list[ComparisonRow],
+) -> None:
+    for captured in metrics:
+        if id(captured) in used_ids:
+            continue
+        missing.append(
+            MissingMetricRow(
+                metric_name=captured.metric_name,
+                benchmark=captured.benchmark,
+                algorithm=captured.algorithm,
+                reason="missing_reported",
+            )
+        )
+        table.append(
+            _to_comparison_row(
+                metric_name=captured.metric_name,
+                benchmark=captured.benchmark,
+                algorithm=captured.algorithm,
+                reported_value="",
+                captured_value=captured.value,
+                match_status="missing_reported",
+                delta_pct=None,
+                absolute_diff=None,
             )
         )
 
+
+def build_reviewer_run_report(
+    paper_id: str,
+    reported_results: list[ReportedResult],
+    metrics_doc: MetricsDocument,
+) -> ReviewerRunReport:
+    """Compare reported_results to captured metrics by (benchmark, algorithm, metric_name)."""
+    by_triple, by_pair = _index_captured(metrics_doc.metrics)
+    matched, missing, table, used_ids = _record_reported_rows(
+        reported_results, by_triple, by_pair
+    )
+    _record_unmatched_captured(metrics_doc.metrics, used_ids, missing, table)
     gaps = _build_gaps(metrics_doc, missing, reported_results)
     confidence = assign_confidence(
         run_status=metrics_doc.run_status,
@@ -251,6 +358,7 @@ def build_reviewer_run_report(
         captured_count=len(metrics_doc.metrics),
         metrics_matched=matched,
         metrics_missing=missing,
+        comparison_table=table,
         confidence=confidence,  # type: ignore[arg-type]
         gaps=gaps,
         summary=summary,

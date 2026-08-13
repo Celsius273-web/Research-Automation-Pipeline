@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from src.agents.reviewer import PaperReviewer
 from src.state import CapturedMetric, MetricsDocument, ReportedResult
 from src.tools.review_report import assign_confidence, build_reviewer_run_report
 
@@ -28,7 +29,7 @@ def test_build_reviewer_run_report_matches_and_missing() -> None:
     assert report.metrics_matched[0].match_status == "close"
     assert abs((report.metrics_matched[0].delta_pct or 0.0) - 20.0) < 0.01
     assert len(report.metrics_missing) == 1
-    assert report.metrics_missing[0].reason == "not_captured"
+    assert report.metrics_missing[0].reason == "missing_captured"
     assert "some phases failed" in report.gaps
     assert report.confidence in {"MEDIUM", "LOW"}
 
@@ -42,6 +43,38 @@ def test_delta_pct_match_status_boundaries() -> None:
     )
     report = build_reviewer_run_report("paper", reported, metrics_doc)
     assert report.metrics_matched[0].match_status == "match"
+
+
+def test_build_reviewer_run_report_compares_list_outputs() -> None:
+    reported = [
+        ReportedResult(
+            benchmark="simple_undirected",
+            algorithm="dfs",
+            metric_name="output",
+            value="[0, 1, 3, 2]",
+        )
+    ]
+    metrics_doc = MetricsDocument(
+        run_status="SUCCESS",
+        metrics=[
+            CapturedMetric(
+                benchmark="simple_undirected",
+                algorithm="dfs",
+                metric_name="output",
+                value="[0, 1, 3, 2]",
+                source="run_graph.py",
+            )
+        ],
+        phases_completed=["algorithms"],
+    )
+    report = PaperReviewer.compare_reported_to_captured(
+        reported,
+        metrics_doc.metrics,
+        paper_id="synthetic_graph",
+        metrics_doc=metrics_doc,
+    )
+    assert report.metrics_matched[0].match_status == "match"
+    assert report.comparison_table[0].match_status == "match"
 
 
 def test_assign_confidence_high_requires_full_success() -> None:
@@ -101,4 +134,4 @@ def test_reviewer_aliases_table1_fx_to_best_objective() -> None:
     assert len(report.metrics_matched) == 1
     assert report.metrics_matched[0].algorithm == "be-cbo"
     assert report.metrics_matched[0].captured_value == -280.0
-    assert any(row.reason == "not_captured" for row in report.metrics_missing)
+    assert any(row.reason == "missing_captured" for row in report.metrics_missing)

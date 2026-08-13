@@ -18,6 +18,8 @@ logging.basicConfig(
 )
 # Planner I/O goes to planner_debug.md; keep a single INFO line for that path.
 logging.getLogger("src.agents.planner").setLevel(logging.INFO)
+logging.getLogger("src.agents.experiment_runner").setLevel(logging.INFO)
+logging.getLogger("src.plan_runner").setLevel(logging.INFO)
 
 from src.config import EXTRACTIONS_DIR, MAX_RETRY_ATTEMPTS, ROOT_DIR
 from src.db import DatabaseError, get_paper_by_id
@@ -51,6 +53,7 @@ from src.pipeline_nodes import (
     make_reviewer_node,
 )
 from src.agents.experiment_runner import ExperimentRunner
+from src.plan_runner import run_saved_plan
 from src.state import (
     AgentEnvelope,
     ExtractionBundle,
@@ -700,6 +703,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Log progress to stdout (no interactive prompts in this path).",
     )
     reviewer.add_argument("--extraction-path", help="Optional extraction artifact path")
+
+    run_plan_cmd = subparsers.add_parser(
+        "run-plan",
+        help="Run Engineer/Executor/Reviewer from a saved plan JSON (skips Analyst, Planner, and ingestion)",
+    )
+    run_plan_cmd.add_argument("--plan-path", required=True, help="Path to AgentEnvelope[PlannerPayload] JSON")
+    run_plan_cmd.add_argument("--paper-id", required=True, help="Paper id used for data/papers/{paper_id}/runs/")
+    run_plan_cmd.add_argument(
+        "--repo-path",
+        required=True,
+        help="Repository mounted into Docker as the working directory (e.g. benchmark/)",
+    )
+    run_plan_cmd.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help="Skip interactive prompts (required for this PoC path).",
+    )
     return parser
 
 
@@ -757,6 +777,13 @@ def main() -> int:
                 non_interactive=args.non_interactive,
                 run_id=args.run_id,
                 extraction_path=args.extraction_path,
+            )
+        if args.command == "run-plan":
+            return run_saved_plan(
+                plan_path=args.plan_path,
+                paper_id=args.paper_id,
+                repo_path=args.repo_path,
+                non_interactive=args.non_interactive,
             )
         return 0
     except KeyboardInterrupt:

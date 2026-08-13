@@ -383,6 +383,7 @@ class EngineerReviewRecord(BaseModel):
 
 class MetricResult(BaseModel):
     benchmark: str = ""
+    algorithm: str = ""
     metric_name: str
     value: str
     source_path: str = ""
@@ -461,14 +462,16 @@ class MatchedMetricRow(BaseModel):
     reported_value: float | str
     captured_value: float | str
     delta_pct: float | None = None
-    match_status: Literal["match", "close", "diverged"] = "diverged"
+    match_status: Literal["match", "close", "diverged", "missing_captured", "missing_reported"] = (
+        "diverged"
+    )
 
 
 class MissingMetricRow(BaseModel):
     metric_name: str
     benchmark: str = ""
     algorithm: str = ""
-    reason: str = "not_captured"
+    reason: str = "missing_captured"
 
 
 class ReviewerRunReport(BaseModel):
@@ -479,6 +482,7 @@ class ReviewerRunReport(BaseModel):
     captured_count: int = 0
     metrics_matched: list[MatchedMetricRow] = Field(default_factory=list)
     metrics_missing: list[MissingMetricRow] = Field(default_factory=list)
+    comparison_table: list["ComparisonRow"] = Field(default_factory=list)
     confidence: Literal["HIGH", "MEDIUM", "LOW"] = "LOW"
     gaps: list[str] = Field(default_factory=list)
     summary: str = ""
@@ -487,6 +491,7 @@ class ReviewerRunReport(BaseModel):
 class ComparisonRow(BaseModel):
     metric_name: str
     benchmark: str = ""
+    algorithm: str = ""
     reported_value: str = ""
     reproduced_value: str = ""
     absolute_difference: float | None = None
@@ -496,6 +501,7 @@ class ComparisonRow(BaseModel):
         "close",
         "diverged",
         "missing_reproduced",
+        "missing_captured",
         "missing_reported",
         "unparsable",
     ]

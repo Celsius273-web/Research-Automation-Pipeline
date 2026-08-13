@@ -29,3 +29,10 @@ def test_detect_language_rust(tmp_path: Path) -> None:
 def test_detect_language_unknown(tmp_path: Path) -> None:
     out = detect_language(str(tmp_path))
     assert out.language == "unknown"
+
+
+def test_detect_language_python_from_source_files(tmp_path: Path) -> None:
+    (tmp_path / "benchmark.py").write_text("print('ok')\n", encoding="utf-8")
+    out = detect_language(str(tmp_path))
+    assert out.language == "python"
+    assert out.has_code is True

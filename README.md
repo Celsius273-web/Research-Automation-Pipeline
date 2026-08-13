@@ -72,6 +72,85 @@ model is the best fit for iterative code-edit loops under local constraints.
    python -m src.main execute --paper-id <paper_id> --with-review
    ```
 
+
+5. **BenchMarking**
+Analyst/Planner still require an **ingested PDF** in Postgres. The updated files are markdown (`benchmark/papers/optimize.md`, `benchmark/papers/graph.md`), so ingest will reject them as-is.
+
+From the repo root, with venv + Ollama + Docker + Postgres up:
+
+---
+
+### 1. Turn the markdown into PDFs and ingest
+
+```bash
+pandoc benchmark/papers/optimize.md -o /tmp/optimize.pdf
+pandoc benchmark/papers/graph.md -o /tmp/graph.pdf
+
+python scripts/ingest_paper.py --init-db \
+  --pdf-path /tmp/optimize.pdf \
+  --paper-id synthetic_optimize \
+  --title "Random Search vs Bayesian Optimization on Synthetic Benchmark Functions"
+
+python scripts/ingest_paper.py \
+  --pdf-path /tmp/graph.pdf \
+  --paper-id synthetic_graph \
+  --title "LLM-Generated Graph Algorithms"
+```
+
+`--init-db` only on the first ingest.
+
+---
+
+### 2. Analyst → Planner → Engineer
+
+**Optimize**
+
+```bash
+python -m src.main analyst --paper-id synthetic_optimize --non-interactive
+python -m src.main plan --paper-id synthetic_optimize --non-interactive
+python -m src.main engineer --paper-id synthetic_optimize --repo-path benchmark/ --non-interactive
+```
+
+**Graph**
+
+```bash
+python -m src.main analyst --paper-id synthetic_graph --non-interactive
+python -m src.main plan --paper-id synthetic_graph --non-interactive
+python -m src.main engineer --paper-id synthetic_graph --repo-path benchmark/ --non-interactive
+
+### Analysis + plan in 1 cmd
+python -m src.main analyze synthetic_optimize --with-plan --non-interactive
+python -m src.main analyze synthetic_graph --with-plan --non-interactive
+
+
+
+python -m src.main engineer --paper-id synthetic_optimize --repo-path benchmark/ --non-interactive
+python -m src.main engineer --paper-id synthetic_graph --repo-path benchmark/ --non-interactive
+
+python -m src.main reviewer --paper-id synthetic_optimize --run-id R1 --non-interactive
+python -m src.main reviewer --paper-id synthetic_graph --run-id R1 --non-interactive
+```
+
+---
+
+### Skip Analyst/Planner (existing hand-written plans)
+
+If you only want Engineer/Reviewer against the current plan JSONs:
+
+```bash
+python -m src.main run-plan \
+  --plan-path data/papers/synthetic_optimize/synthetic_optimize_plan.json \
+  --paper-id synthetic_optimize \
+  --repo-path benchmark/ \
+  --non-interactive
+
+python -m src.main run-plan \
+  --plan-path data/papers/synthetic_graph/synthetic_graph_plan.json \
+  --paper-id synthetic_graph \
+  --repo-path benchmark/ \
+  --non-interactive
+```
+
 ## Architecture
 
 Papers are stored in per-paper bundles under `data/papers/<paper_id>/`:

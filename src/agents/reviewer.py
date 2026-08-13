@@ -15,15 +15,18 @@ from src.agents.prompts.reviewer_prompt import build_reviewer_system_prompt
 from src.config import MODEL_NUM_PREDICT, MODEL_TEMPERATURE, OLLAMA_HOST, REVIEWER_MODEL
 from src.state import (
     AgentEnvelope,
-    ComparisonRow,
+    CapturedMetric,
     MetricResult,
+    MetricsDocument,
     ReportedResult,
     ReviewerPayload,
     ReviewerPayloadCore,
     ReviewerPayloadExtensions,
     ReviewerReport,
+    ReviewerRunReport,
 )
 from src.tools.result_comparator import compare_results, verdict_from_rate
+from src.tools.review_report import build_reviewer_run_report
 
 logger = logging.getLogger(__name__)
 
@@ -198,6 +201,22 @@ Write a concise review narrative from this deterministic comparison context:
             "Failed to build reviewer narrative JSON after retry. "
             f"last_error={last_error}. raw_response={raw_response!r}"
         )
+
+    @staticmethod
+    def compare_reported_to_captured(
+        reported_results: list[ReportedResult],
+        captured_metrics: list[CapturedMetric] | None = None,
+        *,
+        paper_id: str = "",
+        run_status: str = "SUCCESS",
+        metrics_doc: MetricsDocument | None = None,
+    ) -> ReviewerRunReport:
+        """Match each reported result to a captured metric by (benchmark, algorithm, metric_name)."""
+        document = metrics_doc or MetricsDocument(
+            run_status=run_status,
+            metrics=list(captured_metrics or []),
+        )
+        return build_reviewer_run_report(paper_id, reported_results, document)
 
     def generate_report(
         self,

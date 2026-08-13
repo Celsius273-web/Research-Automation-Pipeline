@@ -1,0 +1,16 @@
+[
+  {
+    "benchmark": "simple_undirected",
+    "algorithm": "dfs",
+    "metric_name": "output",
+    "value": "[0, 1, 3, 2]",
+    "source": "run_graph.py"
+  },
+  {
+    "benchmark": "simple_undirected",
+    "algorithm": "dfs",
+    "metric_name": "n_visited",
+    "value": 4,
+    "source": "run_graph.py"
+  }
+]

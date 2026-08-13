@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -35,13 +37,19 @@ from src.tools.metrics_capture import load_metrics_from_path, merge_unique_metri
 from src.tools.paper_venv import build_persistent_setup_command, rewrite_command_for_paper_venv
 from src.tools.run_ids import next_run_id
 
+logger = logging.getLogger(__name__)
+
 
 def _iso_now() -> str:
     return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def _write_json(path: Path, payload: dict) -> None:
-    path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    text = json.dumps(payload, indent=2)
+    with path.open("w", encoding="utf-8") as handle:
+        handle.write(text)
+        handle.flush()
+        os.fsync(handle.fileno())
 
 
 @dataclass
@@ -53,7 +61,12 @@ class ExperimentRunner:
     timeout_seconds: int = EXECUTOR_TIMEOUT_SECONDS
     min_free_memory_gb: float = MIN_FREE_MEMORY_GB
 
-    def execute_paper(self, paper_id: str, repo_path: str | None = None) -> tuple[MetricsDocument, Path]:
+    def execute_paper(
+        self,
+        paper_id: str,
+        repo_path: str | None = None,
+        plan_path: str | Path | None = None,
+    ) -> tuple[MetricsDocument, Path]:
         """Run Engineer for one paper. Returns metrics document and run directory."""
         free_gb = available_memory_gb()
         if free_gb < self.min_free_memory_gb:
@@ -62,16 +75,20 @@ class ExperimentRunner:
                 f"skipping paper '{paper_id}'."
             )
 
-        plan_path = resolve_plan_path(plan_path=None, paper_id=paper_id)
-        if not plan_path.exists():
-            raise FileNotFoundError(f"Plan file does not exist: {plan_path}")
+        resolved_plan = resolve_plan_path(
+            plan_path=str(plan_path) if plan_path is not None else None,
+            paper_id=paper_id,
+        )
+        if not resolved_plan.exists():
+            raise FileNotFoundError(f"Plan file does not exist: {resolved_plan}")
 
-        payload = json.loads(plan_path.read_text(encoding="utf-8"))
+        payload = json.loads(resolved_plan.read_text(encoding="utf-8"))
         envelope = load_planner_envelope(payload)
         if not envelope.payload.phases:
             raise ValueError(f"Plan for '{paper_id}' has no phases to execute.")
 
         bundle = PaperBundle(paper_id)
+        bundle.create_bundle_dir()
         resolved_repo = repo_path or str(bundle.code_dir)
         if not Path(resolved_repo).exists():
             raise FileNotFoundError(f"Repository path does not exist: {resolved_repo}")
@@ -85,7 +102,7 @@ class ExperimentRunner:
 
         metrics_doc = MetricsDocument(timestamp=_iso_now(), attempts=0, logs_captured=True)
         self._log(log_path, f"Engineer start paper_id={paper_id} run_id={run_id} free_memory_gb={free_gb:.2f}")
-        self._log(log_path, f"Plan: {plan_path}")
+        self._log(log_path, f"Plan: {resolved_plan}")
         self._log(log_path, f"Repo: {resolved_repo} language={repo_context.language}")
 
         try:
@@ -193,7 +210,12 @@ class ExperimentRunner:
                         row=row,
                         status="failed",
                     )
-                    break
+                    self._log(
+                        log_path,
+                        f"Command failed for {row_name}; capturing stderr and continuing to next row.",
+                    )
+                    self._persist_metrics(metrics_path, metrics_doc)
+                    continue
 
                 capture_paths = self._results_paths_for_row(phase, row, results_summary)
                 algorithm = self._algorithm_from_row(row)
@@ -276,14 +298,14 @@ class ExperimentRunner:
                 f"runtime={result.runtime_seconds:.2f}s",
             )
             if result.exit_code != 0:
-                print(f"\n{'='*70}")
-                print(f"FAILED ATTEMPT {attempt}/{self.max_attempts}: {step_id}")
-                print(f"{'='*70}")
-                if result.stdout:
-                    print(f"STDOUT:\n{result.stdout}")
-                if result.stderr:
-                    print(f"STDERR:\n{result.stderr}")
-                print(f"{'='*70}\n")
+                logger.warning(
+                    "FAILED ATTEMPT %s/%s: %s\nSTDOUT:\n%s\nSTDERR:\n%s",
+                    attempt,
+                    self.max_attempts,
+                    step_id,
+                    result.stdout,
+                    result.stderr,
+                )
             metrics_doc.exit_code = result.exit_code if not result.timed_out else 124
             self._persist_metrics(metrics_path, metrics_doc)
             if result.exit_code == 0 and not result.timed_out:
@@ -318,8 +340,12 @@ class ExperimentRunner:
             default_algorithm=default_algorithm,
         )
         if error:
-            self._log(log_path, f"Metrics capture note: {error}")
-            metrics_doc.errors.append(error)
+            warning = (
+                f"Results file not found at {results_relpath}; continuing to next row. "
+                f"Detail: {error}"
+            )
+            self._log(log_path, warning)
+            metrics_doc.errors.append(warning)
             return
         metrics_doc.metrics = merge_unique_metrics(metrics_doc.metrics, captured)
         self._log(
@@ -423,4 +449,6 @@ class ExperimentRunner:
         line = f"{_iso_now()} {message}\n"
         with log_path.open("a", encoding="utf-8") as handle:
             handle.write(line)
-        print(message)
+            handle.flush()
+            os.fsync(handle.fileno())
+        logger.info(message)

@@ -1,7 +1,13 @@
 from __future__ import annotations
 
 from src.state import MetricResult, ReportedResult
-from src.tools.result_comparator import compare_results, normalize_metric_name, parse_leading_number, verdict_from_rate
+from src.tools.result_comparator import (
+    compare_metric_values,
+    compare_results,
+    normalize_metric_name,
+    parse_leading_number,
+    verdict_from_rate,
+)
 
 
 def test_normalize_metric_name() -> None:
@@ -29,6 +35,40 @@ def test_compare_results_classification() -> None:
     assert status["accuracy"] == "diverged"
     assert status["missing"] == "missing_reproduced"
     assert 0.0 <= rate <= 1.0
+
+
+def test_compare_metric_values_lists_and_numbers() -> None:
+    status, delta, _abs_diff = compare_metric_values("[0, 1, 3, 2]", "[0, 1, 3, 2]")
+    assert status == "match"
+    assert delta == 0.0
+    status, _, _ = compare_metric_values("[0, 1, 2]", "[0, 2, 1]")
+    assert status == "close"
+    status, delta, _ = compare_metric_values("16.0", "16.2")
+    assert status == "match"
+    assert delta is not None and abs(delta) <= 2.0
+    status, _, _ = compare_metric_values("10", "")
+    assert status == "missing_captured"
+    status, _, _ = compare_metric_values("", "10")
+    assert status == "missing_reported"
+
+
+def test_compare_results_matches_by_algorithm() -> None:
+    reported = [
+        ReportedResult(benchmark="simple_undirected", algorithm="dfs", metric_name="output", value="[0, 1, 3, 2]"),
+        ReportedResult(benchmark="simple_undirected", algorithm="bfs", metric_name="output", value="[0, 1, 2, 3]"),
+    ]
+    captured = [
+        MetricResult(
+            benchmark="simple_undirected",
+            algorithm="dfs",
+            metric_name="output",
+            value="[0, 1, 3, 2]",
+        ),
+    ]
+    rows, _rate = compare_results(reported, captured)
+    status = {(row.algorithm, row.match_status) for row in rows}
+    assert ("dfs", "match") in status
+    assert ("bfs", "missing_reproduced") in status
 
 
 def test_verdict_from_rate() -> None:

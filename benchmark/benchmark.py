@@ -9,22 +9,20 @@ from skopt import gp_minimize
 from skopt.space import Real
 import argparse
 import json
+import logging
 import os
 
 # --- Test Functions ---
 def sphere(x):
     x = np.asarray(x)
-    x = np.asarray(x)
     return np.sum(x**2)
 
 def rastrigin(x):
-    x = np.asarray(x)
     x = np.asarray(x)
     n = len(x)
     return 10 * n + np.sum(x**2 - 10 * np.cos(2 * np.pi * x))
 
 def ackley_2d(x):
-    x = np.asarray(x)
     x = np.asarray(x)
     if len(x) != 2:
         raise ValueError("Ackley function is implemented for 2 dimensions only.")
@@ -35,7 +33,6 @@ def rosenbrock(x):
     return np.sum(100.0 * (x[1:] - x[:-1]**2.0)**2.0 + (1 - x[:-1])**2.0)
 
 def griewank(x):
-    x = np.asarray(x)
     x = np.asarray(x).flatten()
     s = np.sum(x**2 / 4000)
     p = np.prod(np.cos(x / np.sqrt(np.arange(1, len(x) + 1))))
@@ -114,9 +111,10 @@ def run_benchmark(func_name, optimizer_name, seed, n_iter, out_path):
     with open(out_path, "w") as f:
         json.dump(output_data, f, indent=2)
 
-    print(f"Done: {func_name} {optimizer_name} seed={seed} final={final_value}")
+    logging.info("Done: %s %s seed=%s final=%s", func_name, optimizer_name, seed, final_value)
 
 if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     parser = argparse.ArgumentParser(description="Run optimization benchmarks.")
     parser.add_argument("--func", type=str, required=True,
                         choices=["sphere", "rastrigin", "ackley", "rosenbrock", "griewank"],
@@ -128,11 +126,19 @@ if __name__ == "__main__":
                         help="Random seed for reproducibility.")
     parser.add_argument("--n_iter", type=int, default=50,
                         help="Number of iterations/evaluations.")
+    parser.add_argument(
+        "--out",
+        type=str,
+        default="",
+        help="Output CapturedMetric JSON path (default: results/<func>_<optimizer>_s<seed>.json).",
+    )
     args = parser.parse_args()
 
-    # Construct the output path
-    output_dir = "results/synthetic_benchmark"
-    output_filename = f"{args.func}_{args.optimizer}_s{args.seed}.json"
-    out_path = os.path.join(output_dir, output_filename)
+    if args.out:
+        out_path = args.out
+    else:
+        output_dir = "results"
+        output_filename = f"{args.func}_{args.optimizer}_s{args.seed}.json"
+        out_path = os.path.join(output_dir, output_filename)
 
     run_benchmark(args.func, args.optimizer, args.seed, args.n_iter, out_path)

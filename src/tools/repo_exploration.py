@@ -399,6 +399,8 @@ def discover_script_entrypoints(
         for path in children:
             if not path.is_file() or path.suffix.lower() != ".py":
                 continue
+            if path.name in {"setup.py", "setup.cfg", "conftest.py", "conf.py"}:
+                continue
             stem = path.stem.lower()
             relative = path.relative_to(repo_path).as_posix()
             if any(part in stem for part in _ENTRYPOINT_NAME_HINTS):

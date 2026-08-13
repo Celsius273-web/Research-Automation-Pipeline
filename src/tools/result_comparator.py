@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import ast
+import json
 import re
+from typing import Any
 
 from src.config import REVIEW_CLOSE_TOLERANCE_PCT, REVIEW_MATCH_TOLERANCE_PCT
 from src.state import ComparisonRow, MetricResult, ReportedResult
@@ -26,14 +29,140 @@ def parse_leading_number(value: str) -> float | None:
         return None
 
 
+def coerce_numeric(value: object) -> float | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    return parse_leading_number(str(value))
+
+
+def _is_blank(value: object) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return not value.strip()
+    return False
+
+
+def parse_sequence(value: object) -> list[Any] | None:
+    """Parse list-like metric values (DFS order, MST edges). Scalars return None."""
+    if isinstance(value, (list, tuple)):
+        return list(value)
+    if isinstance(value, (int, float, bool)) or value is None:
+        return None
+    text = str(value).strip()
+    if not text or text[0] not in "[({":
+        return None
+    parsed: object
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        try:
+            parsed = ast.literal_eval(text)
+        except (ValueError, SyntaxError):
+            return None
+    if isinstance(parsed, (list, tuple)):
+        return list(parsed)
+    return None
+
+
+def parse_mapping(value: object) -> dict[str, Any] | None:
+    if isinstance(value, dict):
+        return {str(key): item for key, item in value.items()}
+    if isinstance(value, (int, float, bool)) or value is None:
+        return None
+    text = str(value).strip()
+    if not text.startswith("{"):
+        return None
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        try:
+            parsed = ast.literal_eval(text)
+        except (ValueError, SyntaxError):
+            return None
+    if isinstance(parsed, dict):
+        return {str(key): item for key, item in parsed.items()}
+    return None
+
+
+def _sequence_as_set(items: list[Any]) -> set[Any] | None:
+    frozen: list[Any] = []
+    for item in items:
+        if isinstance(item, list):
+            frozen.append(tuple(item))
+        else:
+            frozen.append(item)
+    try:
+        return set(frozen)
+    except TypeError:
+        return None
+
+
+def _match_status_from_delta(delta_pct: float) -> str:
+    abs_delta = abs(delta_pct)
+    if abs_delta <= REVIEW_MATCH_TOLERANCE_PCT:
+        return "match"
+    if abs_delta <= REVIEW_CLOSE_TOLERANCE_PCT:
+        return "close"
+    return "diverged"
+
+
+def compare_metric_values(
+    reported_value: object,
+    captured_value: object,
+) -> tuple[str, float | None, float | None]:
+    """Classify one reported/captured pair. Returns (match_status, delta_pct, abs_diff)."""
+    if _is_blank(reported_value) and not _is_blank(captured_value):
+        return "missing_reported", None, None
+    if not _is_blank(reported_value) and _is_blank(captured_value):
+        return "missing_captured", None, None
+
+    reported_seq = parse_sequence(reported_value)
+    captured_seq = parse_sequence(captured_value)
+    if reported_seq is not None and captured_seq is not None:
+        if reported_seq == captured_seq:
+            return "match", 0.0, 0.0
+        reported_set = _sequence_as_set(reported_seq)
+        captured_set = _sequence_as_set(captured_seq)
+        if reported_set is not None and reported_set == captured_set:
+            return "close", 0.0, 0.0
+        return "diverged", None, None
+
+    reported_map = parse_mapping(reported_value)
+    captured_map = parse_mapping(captured_value)
+    if reported_map is not None and captured_map is not None:
+        if reported_map == captured_map:
+            return "match", 0.0, 0.0
+        return "diverged", None, None
+
+    reported_num = coerce_numeric(reported_value)
+    captured_num = coerce_numeric(captured_value)
+    if reported_num is None or captured_num is None:
+        left = str(reported_value).strip()
+        right = str(captured_value).strip()
+        if left == right:
+            return "match", 0.0, 0.0
+        return "unparsable", None, None
+
+    absolute_diff = abs(reported_num - captured_num)
+    if reported_num == 0:
+        delta_pct = 0.0 if captured_num == 0 else 100.0
+    else:
+        delta_pct = ((captured_num - reported_num) / reported_num) * 100.0
+    return _match_status_from_delta(delta_pct), delta_pct, absolute_diff
+
+
 def _index_metrics(
     values: list[ReportedResult] | list[MetricResult],
-) -> dict[tuple[str, str], str]:
-    out: dict[tuple[str, str], str] = {}
+) -> dict[tuple[str, str, str], str]:
+    out: dict[tuple[str, str, str], str] = {}
     for item in values:
         benchmark = getattr(item, "benchmark", "").strip().lower()
+        algorithm = getattr(item, "algorithm", "").strip().lower()
         metric_name = normalize_metric_name(item.metric_name)
-        out[(benchmark, metric_name)] = item.value
+        out[(benchmark, algorithm, metric_name)] = item.value
     return out
 
 
@@ -49,48 +178,29 @@ def compare_results(
     comparable_total = 0
     comparable_success = 0
 
-    for benchmark, metric_key in all_keys:
-        reported_value = reported_map.get((benchmark, metric_key), "")
-        captured_value = captured_map.get((benchmark, metric_key), "")
-        match_status = "unparsable"
-        absolute_diff: float | None = None
-        relative_diff: float | None = None
-
-        if not reported_value and captured_value:
-            match_status = "missing_reported"
-        elif reported_value and not captured_value:
+    for benchmark, algorithm, metric_key in all_keys:
+        reported_value = reported_map.get((benchmark, algorithm, metric_key), "")
+        captured_value = captured_map.get((benchmark, algorithm, metric_key), "")
+        match_status, delta_pct, absolute_diff = compare_metric_values(
+            reported_value, captured_value
+        )
+        if match_status == "missing_captured":
             match_status = "missing_reproduced"
-        else:
-            reported_num = parse_leading_number(reported_value)
-            captured_num = parse_leading_number(captured_value)
-            if reported_num is None or captured_num is None:
-                match_status = "unparsable"
-            else:
-                comparable_total += 1
-                absolute_diff = abs(reported_num - captured_num)
-                if reported_num == 0:
-                    relative_diff = 0.0 if captured_num == 0 else 100.0
-                else:
-                    relative_diff = abs((captured_num - reported_num) / reported_num) * 100.0
-
-                if relative_diff <= REVIEW_MATCH_TOLERANCE_PCT:
-                    match_status = "match"
-                    comparable_success += 1
-                elif relative_diff <= REVIEW_CLOSE_TOLERANCE_PCT:
-                    match_status = "close"
-                    comparable_success += 1
-                else:
-                    match_status = "diverged"
+        if match_status in {"match", "close", "diverged"} and delta_pct is not None:
+            comparable_total += 1
+            if match_status in {"match", "close"}:
+                comparable_success += 1
 
         rows.append(
             ComparisonRow(
                 metric_name=metric_key,
                 benchmark=benchmark,
-                reported_value=reported_value,
-                reproduced_value=captured_value,
+                algorithm=algorithm,
+                reported_value=str(reported_value),
+                reproduced_value=str(captured_value),
                 absolute_difference=absolute_diff,
-                relative_difference_pct=relative_diff,
-                match_status=match_status,
+                relative_difference_pct=None if delta_pct is None else abs(delta_pct),
+                match_status=match_status,  # type: ignore[arg-type]
             )
         )
 

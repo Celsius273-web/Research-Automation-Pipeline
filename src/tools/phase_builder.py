@@ -980,21 +980,22 @@ def _build_script_phases(
     """Script repos without registries: setup → smoke → experiments → summarize."""
     results_root = f"results/{paper_id}"
     scripts = _unique(
-        [str(item) for item in (exploration.get("script_entrypoints") or [])]
+        [
+            str(item)
+            for item in (exploration.get("script_entrypoints") or [])
+            if Path(str(item)).name not in {"setup.py", "setup.cfg", "conftest.py", "conf.py"}
+        ]
         + [
-            token.strip("`'")
+            token.strip("`'").split("/")[-1]
             for command in (exploration.get("example_commands") or [])
             for token in str(command).split()
-            if token.endswith(".py")
+            if token.strip("`'\"").endswith(".py")
+            and Path(token.strip("`'\"")).name
+            not in {"setup.py", "setup.cfg", "conftest.py", "conf.py"}
         ]
     )
-    tunables = (
-        exploration.get("script_tunables")
-        if isinstance(exploration.get("script_tunables"), dict)
-        else {}
-    )
-    benchmarks = [str(item) for item in (tunables.get("benchmark") or tunables.get("dataset") or [])]
-    algorithms = [str(item) for item in (tunables.get("algorithm") or tunables.get("method") or [])]
+    benchmarks: list[str] = []
+    algorithms: list[str] = []
     # Prefer a tunable-bearing script (e.g. Clustering.py) over unrelated README peers.
     primary_script = scripts[0] if scripts else ""
     if benchmarks and algorithms:

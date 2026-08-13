@@ -45,6 +45,9 @@ class _FakeDockerClient:
         self.status_code = status_code
         self.commands: list[str] = []
 
+    def ping(self) -> bool:
+        return True
+
     def _build(self, **_kwargs):
         return None, []
 
@@ -206,6 +209,91 @@ def test_experiment_runner_retries_then_fails(monkeypatch, tmp_path: Path) -> No
     assert (run_dir / "engineer_attempt_3.log").exists()
     # setup retries 3 times; smoke is skipped via depends_on (no extra docker calls)
     assert len(fake_client.commands) == 3
+
+
+def test_experiment_runner_continues_after_row_failure(monkeypatch, tmp_path: Path) -> None:
+    class _SelectiveClient(_FakeDockerClient):
+        def _run(self, image, command=None, **_kwargs):
+            _ = image
+            cmd = command[2] if command and len(command) >= 3 else ""
+            self.commands.append(cmd)
+            status = 1 if "failme" in cmd else 0
+            container = _FakeContainer(status_code=status)
+            self.last_container = container
+            return container
+
+    fake_client = _SelectiveClient()
+    _monkeypatch_docker(monkeypatch, fake_client)
+
+    paper_id = "partial_paper"
+    papers_dir = tmp_path / "papers" / paper_id
+    code_dir = papers_dir / "code"
+    code_dir.mkdir(parents=True)
+    (code_dir / "requirements.txt").write_text("numpy\n", encoding="utf-8")
+    results_dir = code_dir / "results"
+    results_dir.mkdir()
+    (results_dir / "ok.json").write_text(
+        json.dumps([{"benchmark": "lsq", "metric_name": "regret", "value": 0.01}]),
+        encoding="utf-8",
+    )
+    plan = {
+        "paper": {"paper_id": paper_id, "title": "Test", "pdf_path": "x.pdf"},
+        "plan_envelope": {
+            "schema_version": "2.0",
+            "agent": "planner",
+            "status": "ok",
+            "unknowns": [],
+            "warnings": [],
+            "payload": {
+                "plan_summary": "two rows",
+                "phases": [
+                    {
+                        "phase_id": "suite",
+                        "title": "Suite",
+                        "depends_on": [],
+                        "matrix": [
+                            {
+                                "name": "bad",
+                                "variables": {"benchmark": "lsq"},
+                                "run_command": "python failme.py",
+                                "results_path": "results/missing.json",
+                            },
+                            {
+                                "name": "good",
+                                "variables": {"benchmark": "lsq"},
+                                "run_command": "python ok.py",
+                                "results_path": "results/ok.json",
+                            },
+                        ],
+                    }
+                ],
+            },
+        },
+    }
+    (papers_dir / f"{paper_id}_plan.json").write_text(json.dumps(plan), encoding="utf-8")
+
+    import src.bundle as bundle_mod
+
+    monkeypatch.setattr(bundle_mod, "PAPER_BUNDLES_DIR", tmp_path / "papers")
+    monkeypatch.setattr("src.agents.experiment_runner.available_memory_gb", lambda: 8.0)
+    monkeypatch.setattr("src.agents.experiment_runner.ROOT_DIR", tmp_path)
+
+    docker = DockerExecutor(project_root=tmp_path)
+    dockerfile = tmp_path / "docker" / "python.Dockerfile"
+    dockerfile.parent.mkdir(parents=True, exist_ok=True)
+    dockerfile.write_text("FROM python:3.11-slim\n", encoding="utf-8")
+
+    runner = ExperimentRunner(docker_executor=docker, max_attempts=1)
+    metrics_doc, run_dir = runner.execute_paper(paper_id=paper_id)
+
+    assert any("failme.py" in cmd for cmd in fake_client.commands)
+    assert any("ok.py" in cmd for cmd in fake_client.commands)
+    assert metrics_doc.run_status == "FAILED"
+    assert any(row.status == "failed" for row in metrics_doc.experiment_matrix)
+    assert any(row.status == "completed" for row in metrics_doc.experiment_matrix)
+    assert any(m.metric_name == "regret" for m in metrics_doc.metrics)
+    log_text = (run_dir / "engineer.log").read_text(encoding="utf-8")
+    assert "continuing to next row" in log_text
 
 
 def test_experiment_runner_skips_on_low_memory(monkeypatch, tmp_path: Path) -> None:

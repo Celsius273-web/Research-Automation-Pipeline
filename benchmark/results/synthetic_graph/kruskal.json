@@ -1,0 +1,9 @@
+[
+  {
+    "benchmark": "minimum_spanning_tree",
+    "algorithm": "kruskal",
+    "metric_name": "mst_weight",
+    "value": 17.0,
+    "source": "run_graph.py"
+  }
+]

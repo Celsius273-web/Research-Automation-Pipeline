@@ -59,6 +59,7 @@ def _load_captured_metrics(repo_root: Path, results_path: str) -> tuple[list[Met
             normalized.append(
                 MetricResult(
                     benchmark=str(item.get("benchmark", "")).strip(),
+                    algorithm=str(item.get("algorithm", "")).strip(),
                     metric_name=metric_name,
                     value=str(item.get("value", "")).strip(),
                     source_path=results_path,

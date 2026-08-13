@@ -20,6 +20,7 @@ alwaysApply: true
 - One file does one job. Split a file once it holds more than one clear responsibility (e.g. CLI argument parsing, persistence, interactive prompts, and orchestration logic each belong in their own module).
 - Before adding another responsibility to a file, check its current line count. A file that has crossed roughly 300 lines and keeps growing is a signal to split it, not to keep appending.
 - Name booleans with is, has, or should. Name functions as verbs. Name collections as plurals.
+- DONT MAKE GIT COMMITS WITHOUT MY CONSENT
 
 ## Behavior
 - Search the codebase for an existing function or pattern before writing a new one.
