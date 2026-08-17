@@ -68,6 +68,7 @@ from src.state import (
 )
 from src.tools.docker_executor import DockerExecutor
 from src.tools.language_detect import detect_language
+from src.tools.benchmark_expectations import resolve_review_expectations
 from src.tools.review_report import build_reviewer_run_report
 
 
@@ -535,7 +536,7 @@ def run_reviewer(
     run_id: str,
     extraction_path: str | None = None,
 ) -> int:
-    """Compare extraction reported_results to Engineer metrics.json and write reviewer_report.json."""
+    """Compare benchmark or extraction expectations to Engineer metrics.json."""
     _ = non_interactive
     try:
         resolved_run_dir = resolve_run_dir(paper_id=paper_id, run_id=run_id)
@@ -547,7 +548,7 @@ def run_reviewer(
         if not resolved_extraction.exists():
             print(f"extraction.json not found: {resolved_extraction}")
             return 1
-        reported = load_reported_results(resolved_extraction)
+        reported = resolve_review_expectations(paper_id, resolved_extraction)
         report = build_reviewer_run_report(
             paper_id=paper_id,
             reported_results=reported,
@@ -712,8 +713,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_plan_cmd.add_argument("--paper-id", required=True, help="Paper id used for data/papers/{paper_id}/runs/")
     run_plan_cmd.add_argument(
         "--repo-path",
-        required=True,
-        help="Repository mounted into Docker as the working directory (e.g. benchmark/)",
+        help="Optional construction input directory (defaults to the paper code/ directory)",
     )
     run_plan_cmd.add_argument(
         "--non-interactive",

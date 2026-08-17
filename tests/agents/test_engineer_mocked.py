@@ -127,3 +127,35 @@ def test_engineer_call_retries_after_urlerror(monkeypatch) -> None:
     out = agent._call_ollama_json(context)
     assert out.step_id == "s1"
     assert attempts["count"] == 2
+
+
+def test_parse_engineer_response_accepts_list_extensions() -> None:
+    raw = json.dumps(
+        {
+            "schema_version": "2.0",
+            "agent": "engineer",
+            "status": "partial",
+            "unknowns": [],
+            "warnings": [],
+            "payload": {
+                "core": {
+                    "step_id": "engineer_code",
+                    "detected_language": "python",
+                    "patches": [
+                        {
+                            "file_path": "run_all.py",
+                            "action": "create",
+                            "content": "print(1)\n",
+                            "output": "stdout json",
+                        }
+                    ],
+                    "output_json": {"final_value": "float"},
+                },
+                "extensions": [],
+            },
+        }
+    )
+    out = engineer_module._parse_engineer_response(raw)
+    assert out.step_id == "engineer_code"
+    assert out.patches[0].file_path == "run_all.py"
+    assert out.patches[0].content == "print(1)\n"

@@ -47,6 +47,7 @@ REASONING_FALLBACK_MODEL = os.getenv("REASONING_FALLBACK_MODEL", "gpt-oss:20b")
 # Shared generation defaults.
 MODEL_TEMPERATURE = float(os.getenv("MODEL_TEMPERATURE", "0"))
 MODEL_NUM_PREDICT = int(os.getenv("MODEL_NUM_PREDICT", "1024"))
+ENGINEER_NUM_PREDICT = int(os.getenv("ENGINEER_NUM_PREDICT", "4096"))
 PLANNER_NUM_PREDICT = int(os.getenv("PLANNER_NUM_PREDICT", "4096"))
 
 # Maximum characters fed to the analyst per section call.
@@ -115,6 +116,18 @@ ENGINEER_EXPAND_FULL_AXES = os.getenv("ENGINEER_EXPAND_FULL_AXES", "1").strip().
 MAX_RETRY_ATTEMPTS = int(os.getenv("MAX_RETRY_ATTEMPTS", "5"))
 # Plan-driven Engineer CLI retries the same command without LLM patches.
 ENGINEER_MAX_ATTEMPTS = int(os.getenv("ENGINEER_MAX_ATTEMPTS", "3"))
+# Do not retry or continue a matrix after these Python failures.
+FATAL_COMMAND_MARKERS = (
+    "Traceback (most recent call last):",
+    "AttributeError:",
+    "ImportError:",
+    "ModuleNotFoundError:",
+    "SyntaxError:",
+    "NameError:",
+    "TypeError:",
+    "KeyError:",
+    "ValueError:",
+)
 EXECUTOR_TIMEOUT_SECONDS = int(os.getenv("EXECUTOR_TIMEOUT_SECONDS", "600"))
 EXECUTOR_LOG_MAX_CHARS = int(os.getenv("EXECUTOR_LOG_MAX_CHARS", "20000"))
 # Skip a paper when free RAM is below this threshold (16GB hosts get tight under Docker).

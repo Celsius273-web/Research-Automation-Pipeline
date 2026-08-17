@@ -1,0 +1,778 @@
+{
+  "paper_id": "synthetic_optimize",
+  "reported_count": 20,
+  "captured_count": 44,
+  "metrics_matched": [
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "sphere",
+      "algorithm": "random_search",
+      "reported_value": 10.9768,
+      "captured_value": 8.782740253957082,
+      "delta_pct": -19.98815452630019,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "sphere",
+      "algorithm": "random_search",
+      "reported_value": 10.9768,
+      "captured_value": 8.782740253957082,
+      "delta_pct": -19.98815452630019,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "sphere",
+      "algorithm": "bayesian_optimization",
+      "reported_value": 0.0029,
+      "captured_value": 0.004501882133728647,
+      "delta_pct": 55.23731495616025,
+      "match_status": "diverged"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "sphere",
+      "algorithm": "bayesian_optimization",
+      "reported_value": 0.0029,
+      "captured_value": 0.004501882133728647,
+      "delta_pct": 55.23731495616025,
+      "match_status": "diverged"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "rastrigin",
+      "algorithm": "random_search",
+      "reported_value": 48.4342,
+      "captured_value": 43.28460028879026,
+      "delta_pct": -10.632156020352847,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "rastrigin",
+      "algorithm": "random_search",
+      "reported_value": 48.4342,
+      "captured_value": 43.28460028879026,
+      "delta_pct": -10.632156020352847,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "rastrigin",
+      "algorithm": "bayesian_optimization",
+      "reported_value": 32.7766,
+      "captured_value": 20.914991984757464,
+      "delta_pct": -36.18925701641579,
+      "match_status": "diverged"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "rastrigin",
+      "algorithm": "bayesian_optimization",
+      "reported_value": 32.7766,
+      "captured_value": 20.914991984757464,
+      "delta_pct": -36.18925701641579,
+      "match_status": "diverged"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "ackley",
+      "algorithm": "random_search",
+      "reported_value": 3.6163,
+      "captured_value": 3.088256863237661,
+      "delta_pct": -14.60175142444872,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "ackley",
+      "algorithm": "random_search",
+      "reported_value": 3.6163,
+      "captured_value": 3.088256863237661,
+      "delta_pct": -14.60175142444872,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "ackley",
+      "algorithm": "bayesian_optimization",
+      "reported_value": 0.1462,
+      "captured_value": 0.1287471602598811,
+      "delta_pct": -11.937646881066286,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "ackley",
+      "algorithm": "bayesian_optimization",
+      "reported_value": 0.1462,
+      "captured_value": 0.1287471602598811,
+      "delta_pct": -11.937646881066286,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "rosenbrock",
+      "algorithm": "random_search",
+      "reported_value": 256.6105,
+      "captured_value": 206.77795380332378,
+      "delta_pct": -19.41952733683003,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "rosenbrock",
+      "algorithm": "random_search",
+      "reported_value": 256.6105,
+      "captured_value": 206.77795380332378,
+      "delta_pct": -19.41952733683003,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "rosenbrock",
+      "algorithm": "bayesian_optimization",
+      "reported_value": 16.8361,
+      "captured_value": 3.1256575656272405,
+      "delta_pct": -81.43478854587916,
+      "match_status": "diverged"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "rosenbrock",
+      "algorithm": "bayesian_optimization",
+      "reported_value": 16.8361,
+      "captured_value": 3.1256575656272405,
+      "delta_pct": -81.43478854587916,
+      "match_status": "diverged"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "griewank",
+      "algorithm": "random_search",
+      "reported_value": 38.5694,
+      "captured_value": 31.135826812914285,
+      "delta_pct": -19.273240411014214,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "griewank",
+      "algorithm": "random_search",
+      "reported_value": 38.5694,
+      "captured_value": 31.135826812914285,
+      "delta_pct": -19.273240411014214,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "griewank",
+      "algorithm": "bayesian_optimization",
+      "reported_value": 0.7424,
+      "captured_value": 1.0741889697956748,
+      "delta_pct": 44.69140218152948,
+      "match_status": "diverged"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "griewank",
+      "algorithm": "bayesian_optimization",
+      "reported_value": 0.7424,
+      "captured_value": 1.0741889697956748,
+      "delta_pct": 44.69140218152948,
+      "match_status": "diverged"
+    }
+  ],
+  "metrics_missing": [
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "",
+      "algorithm": "random_search",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "",
+      "algorithm": "random_search",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "",
+      "algorithm": "bayesian_optimization",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "",
+      "algorithm": "bayesian_optimization",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "sphere",
+      "algorithm": "random_search",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "sphere",
+      "algorithm": "random_search",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "sphere",
+      "algorithm": "bayesian_optimization",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "sphere",
+      "algorithm": "bayesian_optimization",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "rastrigin",
+      "algorithm": "random_search",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "rastrigin",
+      "algorithm": "random_search",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "rastrigin",
+      "algorithm": "bayesian_optimization",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "rastrigin",
+      "algorithm": "bayesian_optimization",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "ackley",
+      "algorithm": "random_search",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "ackley",
+      "algorithm": "random_search",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "ackley",
+      "algorithm": "bayesian_optimization",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "ackley",
+      "algorithm": "bayesian_optimization",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "rosenbrock",
+      "algorithm": "random_search",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "rosenbrock",
+      "algorithm": "random_search",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "rosenbrock",
+      "algorithm": "bayesian_optimization",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "rosenbrock",
+      "algorithm": "bayesian_optimization",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "griewank",
+      "algorithm": "random_search",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "griewank",
+      "algorithm": "random_search",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "griewank",
+      "algorithm": "bayesian_optimization",
+      "reason": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "griewank",
+      "algorithm": "bayesian_optimization",
+      "reason": "missing_reported"
+    }
+  ],
+  "comparison_table": [
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "sphere",
+      "algorithm": "random_search",
+      "reported_value": "10.9768",
+      "reproduced_value": "8.782740253957082",
+      "absolute_difference": 2.194059746042919,
+      "relative_difference_pct": 19.98815452630019,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "sphere",
+      "algorithm": "random_search",
+      "reported_value": "10.9768",
+      "reproduced_value": "8.782740253957082",
+      "absolute_difference": 2.194059746042919,
+      "relative_difference_pct": 19.98815452630019,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "sphere",
+      "algorithm": "bayesian_optimization",
+      "reported_value": "0.0029",
+      "reproduced_value": "0.004501882133728647",
+      "absolute_difference": 0.0016018821337286469,
+      "relative_difference_pct": 55.23731495616025,
+      "match_status": "diverged"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "sphere",
+      "algorithm": "bayesian_optimization",
+      "reported_value": "0.0029",
+      "reproduced_value": "0.004501882133728647",
+      "absolute_difference": 0.0016018821337286469,
+      "relative_difference_pct": 55.23731495616025,
+      "match_status": "diverged"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "rastrigin",
+      "algorithm": "random_search",
+      "reported_value": "48.4342",
+      "reproduced_value": "43.28460028879026",
+      "absolute_difference": 5.1495997112097385,
+      "relative_difference_pct": 10.632156020352847,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "rastrigin",
+      "algorithm": "random_search",
+      "reported_value": "48.4342",
+      "reproduced_value": "43.28460028879026",
+      "absolute_difference": 5.1495997112097385,
+      "relative_difference_pct": 10.632156020352847,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "rastrigin",
+      "algorithm": "bayesian_optimization",
+      "reported_value": "32.7766",
+      "reproduced_value": "20.914991984757464",
+      "absolute_difference": 11.861608015242538,
+      "relative_difference_pct": 36.18925701641579,
+      "match_status": "diverged"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "rastrigin",
+      "algorithm": "bayesian_optimization",
+      "reported_value": "32.7766",
+      "reproduced_value": "20.914991984757464",
+      "absolute_difference": 11.861608015242538,
+      "relative_difference_pct": 36.18925701641579,
+      "match_status": "diverged"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "ackley",
+      "algorithm": "random_search",
+      "reported_value": "3.6163",
+      "reproduced_value": "3.088256863237661",
+      "absolute_difference": 0.528043136762339,
+      "relative_difference_pct": 14.60175142444872,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "ackley",
+      "algorithm": "random_search",
+      "reported_value": "3.6163",
+      "reproduced_value": "3.088256863237661",
+      "absolute_difference": 0.528043136762339,
+      "relative_difference_pct": 14.60175142444872,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "ackley",
+      "algorithm": "bayesian_optimization",
+      "reported_value": "0.1462",
+      "reproduced_value": "0.1287471602598811",
+      "absolute_difference": 0.01745283974011891,
+      "relative_difference_pct": 11.937646881066286,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "ackley",
+      "algorithm": "bayesian_optimization",
+      "reported_value": "0.1462",
+      "reproduced_value": "0.1287471602598811",
+      "absolute_difference": 0.01745283974011891,
+      "relative_difference_pct": 11.937646881066286,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "rosenbrock",
+      "algorithm": "random_search",
+      "reported_value": "256.6105",
+      "reproduced_value": "206.77795380332378",
+      "absolute_difference": 49.83254619667622,
+      "relative_difference_pct": 19.41952733683003,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "rosenbrock",
+      "algorithm": "random_search",
+      "reported_value": "256.6105",
+      "reproduced_value": "206.77795380332378",
+      "absolute_difference": 49.83254619667622,
+      "relative_difference_pct": 19.41952733683003,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "rosenbrock",
+      "algorithm": "bayesian_optimization",
+      "reported_value": "16.8361",
+      "reproduced_value": "3.1256575656272405",
+      "absolute_difference": 13.710442434372759,
+      "relative_difference_pct": 81.43478854587916,
+      "match_status": "diverged"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "rosenbrock",
+      "algorithm": "bayesian_optimization",
+      "reported_value": "16.8361",
+      "reproduced_value": "3.1256575656272405",
+      "absolute_difference": 13.710442434372759,
+      "relative_difference_pct": 81.43478854587916,
+      "match_status": "diverged"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "griewank",
+      "algorithm": "random_search",
+      "reported_value": "38.5694",
+      "reproduced_value": "31.135826812914285",
+      "absolute_difference": 7.433573187085717,
+      "relative_difference_pct": 19.273240411014214,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "griewank",
+      "algorithm": "random_search",
+      "reported_value": "38.5694",
+      "reproduced_value": "31.135826812914285",
+      "absolute_difference": 7.433573187085717,
+      "relative_difference_pct": 19.273240411014214,
+      "match_status": "close"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "griewank",
+      "algorithm": "bayesian_optimization",
+      "reported_value": "0.7424",
+      "reproduced_value": "1.0741889697956748",
+      "absolute_difference": 0.33178896979567485,
+      "relative_difference_pct": 44.69140218152948,
+      "match_status": "diverged"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "griewank",
+      "algorithm": "bayesian_optimization",
+      "reported_value": "0.7424",
+      "reproduced_value": "1.0741889697956748",
+      "absolute_difference": 0.33178896979567485,
+      "relative_difference_pct": 44.69140218152948,
+      "match_status": "diverged"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "",
+      "algorithm": "random_search",
+      "reported_value": "",
+      "reproduced_value": "31.135826812914285",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "",
+      "algorithm": "random_search",
+      "reported_value": "",
+      "reproduced_value": "31.135826812914285",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "",
+      "algorithm": "bayesian_optimization",
+      "reported_value": "",
+      "reproduced_value": "0.1287471602598811",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "",
+      "algorithm": "bayesian_optimization",
+      "reported_value": "",
+      "reproduced_value": "0.1287471602598811",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "sphere",
+      "algorithm": "random_search",
+      "reported_value": "",
+      "reproduced_value": "14.115619664928621",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "sphere",
+      "algorithm": "random_search",
+      "reported_value": "",
+      "reproduced_value": "14.115619664928621",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "sphere",
+      "algorithm": "bayesian_optimization",
+      "reported_value": "",
+      "reproduced_value": "0.010098106702871087",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "sphere",
+      "algorithm": "bayesian_optimization",
+      "reported_value": "",
+      "reproduced_value": "0.010098106702871087",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "rastrigin",
+      "algorithm": "random_search",
+      "reported_value": "",
+      "reproduced_value": "52.61822926361121",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "rastrigin",
+      "algorithm": "random_search",
+      "reported_value": "",
+      "reproduced_value": "52.61822926361121",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "rastrigin",
+      "algorithm": "bayesian_optimization",
+      "reported_value": "",
+      "reproduced_value": "28.433182250031948",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "rastrigin",
+      "algorithm": "bayesian_optimization",
+      "reported_value": "",
+      "reproduced_value": "28.433182250031948",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "ackley",
+      "algorithm": "random_search",
+      "reported_value": "",
+      "reproduced_value": "6.1905377890753215",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "ackley",
+      "algorithm": "random_search",
+      "reported_value": "",
+      "reproduced_value": "6.1905377890753215",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "ackley",
+      "algorithm": "bayesian_optimization",
+      "reported_value": "",
+      "reproduced_value": "0.045905239583408974",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "ackley",
+      "algorithm": "bayesian_optimization",
+      "reported_value": "",
+      "reproduced_value": "0.045905239583408974",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "rosenbrock",
+      "algorithm": "random_search",
+      "reported_value": "",
+      "reproduced_value": "371.51540103446354",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "rosenbrock",
+      "algorithm": "random_search",
+      "reported_value": "",
+      "reproduced_value": "371.51540103446354",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "rosenbrock",
+      "algorithm": "bayesian_optimization",
+      "reported_value": "",
+      "reproduced_value": "22.31228434763197",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "rosenbrock",
+      "algorithm": "bayesian_optimization",
+      "reported_value": "",
+      "reproduced_value": "22.31228434763197",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "griewank",
+      "algorithm": "random_search",
+      "reported_value": "",
+      "reproduced_value": "49.635423351418424",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "griewank",
+      "algorithm": "random_search",
+      "reported_value": "",
+      "reproduced_value": "49.635423351418424",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "simple_regret",
+      "benchmark": "griewank",
+      "algorithm": "bayesian_optimization",
+      "reported_value": "",
+      "reproduced_value": "0.7856827046335222",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    },
+    {
+      "metric_name": "final_value",
+      "benchmark": "griewank",
+      "algorithm": "bayesian_optimization",
+      "reported_value": "",
+      "reproduced_value": "0.7856827046335222",
+      "absolute_difference": null,
+      "relative_difference_pct": null,
+      "match_status": "missing_reported"
+    }
+  ],
+  "confidence": "MEDIUM",
+  "gaps": [],
+  "summary": "20 of 20 metrics compared (44 captured). Matched metrics within 20%. 8 metric(s) diverged."
+}

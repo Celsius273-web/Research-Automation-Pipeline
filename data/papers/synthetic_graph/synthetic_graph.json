@@ -1,0 +1,36 @@
+{
+  "paper": {
+    "paper_id": "synthetic_graph",
+    "title": "LLM-generated implementations of classic graph algorithms",
+    "pdf_path": "benchmark/papers/graph.md",
+    "arxiv_id": null
+  },
+  "review": {
+    "status": "approved",
+    "notes": "Hand-written extraction for run-plan PoC (Analyst skipped). Values are NetworkX ground truth."
+  },
+  "by_section": {},
+  "merged": {
+    "research_question": "Can an AI system implement classic graph algorithms correctly from algorithm specifications?",
+    "paper_overview": "Five classic graph algorithms are implemented from detailed specifications. Each algorithm is tested on representative test cases with computed ground truth.",
+    "methodology": "Engineer receives algorithm specifications including input/output formats and constraints. Engineer writes implementations. Validator tests each algorithm on test cases and compares outputs to expected behavior.",
+    "datasets_or_benchmarks": [
+      "simple_undirected",
+      "weighted_shortest_path",
+      "minimum_spanning_tree",
+      "dag"
+    ],
+    "variables": ["algorithm", "test_graph"],
+    "hyperparameters": {},
+    "evaluation_metrics": ["output", "path_length", "mst_weight"],
+    "reported_results": [
+      {"benchmark": "simple_undirected", "algorithm": "dfs", "metric_name": "output", "value": "[0, 1, 3, 2]", "source": "benchmark/graphs.json ground_truth"},
+      {"benchmark": "simple_undirected", "algorithm": "dfs", "metric_name": "n_visited", "value": "4", "source": "benchmark/graphs.json ground_truth"},
+      {"benchmark": "simple_undirected", "algorithm": "bfs", "metric_name": "output", "value": "[0, 1, 2, 3]", "source": "benchmark/graphs.json ground_truth"},
+      {"benchmark": "simple_undirected", "algorithm": "bfs", "metric_name": "n_visited", "value": "4", "source": "benchmark/graphs.json ground_truth"},
+      {"benchmark": "weighted_shortest_path", "algorithm": "dijkstra", "metric_name": "path_length", "value": "16.0", "source": "benchmark/graphs.json ground_truth"},
+      {"benchmark": "minimum_spanning_tree", "algorithm": "kruskal", "metric_name": "mst_weight", "value": "17.0", "source": "benchmark/graphs.json ground_truth"}
+    ],
+    "notes": "Test validation measures correctness: output format matches spec, node orderings are structurally valid, numeric metrics within ±2% tolerance."
+  }
+}

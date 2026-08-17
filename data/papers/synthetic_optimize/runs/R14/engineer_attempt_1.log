@@ -1,0 +1,9 @@
+$ .venv/bin/python run_all.py --function griewank --optimizer bayesian_optimization --seed 1
+exit_code=0 timed_out=False runtime_seconds=14.14
+
+STDOUT:
+{"function": "griewank", "optimizer": "bayesian_optimization", "seed": 1, "simple_regret": 0.7856827046335222, "final_value": 0.7856827046335222}
+
+
+STDERR:
+

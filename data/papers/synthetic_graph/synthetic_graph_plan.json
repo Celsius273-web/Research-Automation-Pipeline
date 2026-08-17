@@ -1,0 +1,172 @@
+{
+  "paper": {
+    "paper_id": "synthetic_graph",
+    "title": "LLM-generated implementations of classic graph algorithms",
+    "pdf_path": null,
+    "arxiv_id": null
+  },
+  "plan_review": {
+    "status": "approved",
+    "notes": "Hand-written plan for run-plan PoC (Planner skipped)."
+  },
+  "source_extraction_path": "data/papers/synthetic_graph/synthetic_graph.json",
+  "plan_envelope": {
+    "schema_version": "2.0",
+    "agent": "planner",
+    "status": "ok",
+    "unknowns": [],
+    "warnings": [],
+    "payload": {
+      "plan_summary": "Engineer implements 5 classic graph algorithms from specifications and test data. Reviewer validates correctness through systematic testing.",
+      "domain": "graph_algorithms",
+      "objective": "Evaluate Engineer's ability to implement DFS, BFS, Dijkstra, Floyd-Warshall, and Kruskal from specifications and test data.",
+      "results_summary_path": "",
+      "phases": [
+        {
+          "phase_id": "setup",
+          "title": "Install Python dependencies",
+          "kind": "setup",
+          "goal": "Install networkx and numpy into the paper venv.",
+          "depends_on": [],
+          "variables": [],
+          "axes": {},
+          "run_template": "pip install -r requirements.txt",
+          "matrix": [],
+          "planned_actions": "pip install -r requirements.txt",
+          "results_path": ""
+        },
+        {
+          "phase_id": "engineer_code",
+          "title": "Engineer implements 5 graph algorithms",
+          "kind": "construct",
+          "goal": "Engineer writes Python implementations of 5 algorithms and returns code + metrics in metrics.json.",
+          "depends_on": ["setup"],
+          "variables": [],
+          "axes": {},
+          "run_template": "",
+          "matrix": [],
+          "planned_actions": "Engineer generates graph_algorithms.py. The runner validates it with run_graph.py.",
+          "results_path": "",
+          "input_paths": ["graphs.json", "run_graph.py", "setup_graph.py", "requirements.txt"],
+          "required_artifacts": ["graph_algorithms.py"],
+          "acceptance_commands": ["python -m py_compile graph_algorithms.py"],
+          "specification": {
+            "test_data_path": "test_data.json",
+            "algorithm_specs": {
+            "dfs": {
+              "input": "adjacency list dict {node: [neighbors]}, start node (int)",
+              "output": "list of visited nodes in traversal order",
+              "constraints": "iterative or recursive; must visit all reachable nodes; graph structure in test_data.json",
+              "test_graph": "simple_undirected"
+            },
+            "bfs": {
+              "input": "adjacency list dict {node: [neighbors]}, start node (int)",
+              "output": "list of visited nodes in breadth-first order",
+              "constraints": "must use queue data structure; visit nodes level-by-level; graph structure in test_data.json",
+              "test_graph": "simple_undirected"
+            },
+            "dijkstra": {
+              "input": "weighted graph dict {node: [(neighbor, weight)]}, source node (int)",
+              "output": "dict {node: shortest_distance}, or tuple (distances, paths) if paths requested",
+              "constraints": "non-negative weights only; use priority queue; return shortest path distances from source to all reachable nodes",
+              "test_graph": "weighted_shortest_path"
+            },
+            "kruskal": {
+              "input": "list of edges [(u, v, weight)] for undirected graph, node count (int)",
+              "output": "tuple (mst_edges, total_weight) where mst_edges is list of (u, v, weight)",
+              "constraints": "minimum spanning tree (acyclic, minimum total weight); use union-find or Kruskal's algorithm; no edge is repeated",
+              "test_graph": "minimum_spanning_tree"
+            },
+            "floyd_warshall": {
+              "input": "weighted graph dict {node: [(neighbor, weight)]}",
+              "output": "dict {source: {target: shortest_distance}} for all node pairs",
+              "constraints": "support disconnected node pairs using infinity; match all-pairs shortest-path distances",
+              "test_graph": "weighted_shortest_path"
+            }
+            }
+          }
+        },
+        {
+          "phase_id": "graph_validation",
+          "title": "Validate Engineer algorithms against benchmark graphs",
+          "kind": "execute",
+          "goal": "Run each implemented algorithm through run_graph.py and capture CapturedMetric JSON.",
+          "depends_on": ["engineer_code"],
+          "variables": ["algorithm", "benchmark"],
+          "axes": {},
+          "run_template": "",
+          "matrix": [
+            {
+              "name": "dfs_simple_undirected",
+              "variables": {"algorithm": "dfs", "benchmark": "simple_undirected"},
+              "run_command": "python run_graph.py --algorithm dfs --graph simple_undirected --out results/synthetic_graph/dfs.json",
+              "results_path": "results/synthetic_graph/dfs.json",
+              "metrics": ["output", "n_visited"]
+            },
+            {
+              "name": "bfs_simple_undirected",
+              "variables": {"algorithm": "bfs", "benchmark": "simple_undirected"},
+              "run_command": "python run_graph.py --algorithm bfs --graph simple_undirected --out results/synthetic_graph/bfs.json",
+              "results_path": "results/synthetic_graph/bfs.json",
+              "metrics": ["output", "n_visited"]
+            },
+            {
+              "name": "dijkstra_weighted_shortest_path",
+              "variables": {"algorithm": "dijkstra", "benchmark": "weighted_shortest_path"},
+              "run_command": "python run_graph.py --algorithm dijkstra --graph weighted_shortest_path --out results/synthetic_graph/dijkstra.json",
+              "results_path": "results/synthetic_graph/dijkstra.json",
+              "metrics": ["path_length", "output"]
+            },
+            {
+              "name": "floyd_warshall_weighted_shortest_path",
+              "variables": {"algorithm": "floyd_warshall", "benchmark": "weighted_shortest_path"},
+              "run_command": "python run_graph.py --algorithm floyd_warshall --graph weighted_shortest_path --out results/synthetic_graph/floyd_warshall.json",
+              "results_path": "results/synthetic_graph/floyd_warshall.json",
+              "metrics": ["output", "path_length_0_to_9"]
+            },
+            {
+              "name": "kruskal_minimum_spanning_tree",
+              "variables": {"algorithm": "kruskal", "benchmark": "minimum_spanning_tree"},
+              "run_command": "python run_graph.py --algorithm kruskal --graph minimum_spanning_tree --out results/synthetic_graph/kruskal.json",
+              "results_path": "results/synthetic_graph/kruskal.json",
+              "metrics": ["mst_weight"]
+            }
+          ],
+          "planned_actions": "Execute run_graph.py for each algorithm using Engineer graph_algorithms.py.",
+          "results_path": ""
+        }
+      ],
+      "assumptions": [
+        "Engineer generates implementations of 5 algorithms (dfs, bfs, dijkstra, floyd_warshall, kruskal).",
+        "Engineer receives test_data.json (input graphs only: nodes, edges, weights, adjacency lists).",
+        "Algorithm specs embedded in plan: input/output format and constraints for each algorithm.",
+        "Engineer writes single artifact: metrics.json containing code segment + test results for observability."
+      ],
+      "constraints": [
+        "CPU only.",
+        "Engineer timeout: 10 minutes (code generation + local testing).",
+        "No external ground truth exposed to Engineer during construction."
+      ],
+      "missing_context": [],
+      "verification_checks": ["exit_code:0", "output_format_matches_spec", "all_nodes_reachable"],
+      "risks": [
+        "DFS/BFS order may differ from NetworkX if adjacency lists are built differently.",
+        "Dijkstra: Engineer may forget non-negative weight assumption.",
+        "Kruskal: Union-find implementation bugs are common.",
+        "Floyd-Warshall must represent unreachable pairs consistently."
+      ],
+      "organization": [],
+      "execution": ["Setup, Engineer writes graph_algorithms.py, runner validates with run_graph.py, Reviewer grades against benchmark ground truth."],
+      "repo_usage": [
+        "Engineer reads staged graphs.json without embedded ground_truth answers.",
+        "run_graph.py executes Engineer code and writes per-algorithm metric JSON under results/synthetic_graph/."
+      ],
+      "engineer_notes": [
+        "You receive graphs.json with test graphs (nodes, edges, adjacency lists).",
+        "Algorithm specs are in the plan above: input format, output format, and constraints for each of the 5 algorithms.",
+        "Implement all 5 algorithms: dfs, bfs, dijkstra, floyd_warshall, kruskal.",
+        "The runner validates implementations with run_graph.py after construction."
+      ]
+    }
+  }
+}

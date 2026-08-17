@@ -52,10 +52,12 @@ def _stamp(
     *,
     default_benchmark: str,
     default_algorithm: str,
+    default_seed: str,
 ) -> CapturedMetric:
     benchmark = metric.benchmark.strip() or default_benchmark
     algorithm = metric.algorithm.strip() or default_algorithm
-    return metric.model_copy(update={"benchmark": benchmark, "algorithm": algorithm})
+    seed = metric.seed.strip() or default_seed
+    return metric.model_copy(update={"benchmark": benchmark, "algorithm": algorithm, "seed": seed})
 
 
 def _from_mapping(
@@ -65,8 +67,11 @@ def _from_mapping(
     default_algorithm: str = "",
 ) -> list[CapturedMetric]:
     metrics: list[CapturedMetric] = []
-    payload_algo = str(payload.get("algo_name") or payload.get("algorithm") or "").strip()
+    payload_algo = str(
+        payload.get("algo_name") or payload.get("algorithm") or payload.get("optimizer") or ""
+    ).strip()
     algorithm = default_algorithm or payload_algo
+    seed = str(payload.get("seed", "")).strip()
 
     if "aggregates" in payload and isinstance(payload["aggregates"], list):
         for item in payload["aggregates"]:
@@ -82,6 +87,7 @@ def _from_mapping(
                 CapturedMetric(
                     benchmark=str(item.get("benchmark", default_benchmark)).strip(),
                     algorithm=str(item.get("algorithm", algorithm)).strip(),
+                    seed=str(item.get("seed", seed)).strip(),
                     metric_name=metric_name,
                     value=_coerce_metric_value(value),
                     source=str(item.get("source_file_path") or source),
@@ -100,6 +106,7 @@ def _from_mapping(
             CapturedMetric(
                 benchmark=benchmark,
                 algorithm=algorithm,
+                seed=seed,
                 metric_name="final_objective",
                 value=float(y_values[-1]),
                 source=source,
@@ -109,6 +116,7 @@ def _from_mapping(
             CapturedMetric(
                 benchmark=benchmark,
                 algorithm=algorithm,
+                seed=seed,
                 metric_name="best_objective",
                 value=float(min(y_values)),
                 source=source,
@@ -118,6 +126,7 @@ def _from_mapping(
             CapturedMetric(
                 benchmark=benchmark,
                 algorithm=algorithm,
+                seed=seed,
                 metric_name="n_evaluations",
                 value=float(len(y_values)),
                 source=source,
@@ -133,6 +142,9 @@ def _from_mapping(
             "paper_reported_results",
             "algo_name",
             "algorithm",
+            "optimizer",
+            "function",
+            "seed",
             "fun_name",
         }:
             continue
@@ -142,6 +154,7 @@ def _from_mapping(
             CapturedMetric(
                 benchmark=default_benchmark,
                 algorithm=algorithm,
+                seed=seed,
                 metric_name=name,
                 value=_coerce_metric_value(value),
                 source=source,
@@ -169,6 +182,7 @@ def _from_list(
             CapturedMetric(
                 benchmark=str(item.get("benchmark", default_benchmark)).strip(),
                 algorithm=str(item.get("algorithm", default_algorithm)).strip(),
+                seed=str(item.get("seed", "")).strip(),
                 metric_name=metric_name,
                 value=_coerce_metric_value(item.get("value")),
                 source=str(item.get("source") or source),
@@ -255,11 +269,56 @@ def resolve_results_artifact(results_path: Path) -> Path | None:
     return None
 
 
+def load_metrics_from_text(
+    text: str,
+    *,
+    source: str = "stdout",
+    default_benchmark: str = "",
+    default_algorithm: str = "",
+    default_seed: str = "",
+) -> tuple[list[CapturedMetric], str | None]:
+    """Parse metric rows from a JSON stdout payload. Never invents values."""
+    raw = text.strip()
+    if not raw:
+        return [], "stdout was empty"
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        start, end = raw.find("{"), raw.rfind("}")
+        if start == -1 or end <= start:
+            start, end = raw.find("["), raw.rfind("]")
+        if start == -1 or end <= start:
+            return [], "stdout was not JSON"
+        try:
+            payload = json.loads(raw[start : end + 1])
+        except json.JSONDecodeError as exc:
+            return [], f"stdout JSON parse failed: {exc}"
+    if isinstance(payload, dict):
+        metrics = _from_mapping(payload, source, default_benchmark, default_algorithm)
+    elif isinstance(payload, list):
+        metrics = _from_list(payload, source, default_benchmark, default_algorithm)
+    else:
+        return [], "stdout JSON must be an object or list"
+    metrics = [
+        _stamp(
+            item,
+            default_benchmark=default_benchmark,
+            default_algorithm=default_algorithm,
+            default_seed=default_seed,
+        )
+        for item in metrics
+    ]
+    if not metrics:
+        return [], "stdout JSON contained no metric rows"
+    return metrics, None
+
+
 def load_metrics_from_path(
     results_path: Path,
     *,
     default_benchmark: str = "",
     default_algorithm: str = "",
+    default_seed: str = "",
 ) -> tuple[list[CapturedMetric], str | None]:
     """Load metrics from a JSON, CSV, or pickle results file. Never invents values."""
     resolved = resolve_results_artifact(results_path)
@@ -285,7 +344,12 @@ def load_metrics_from_path(
         return [], f"Failed to parse results at {resolved}: {exc}"
 
     metrics = [
-        _stamp(item, default_benchmark=default_benchmark, default_algorithm=default_algorithm)
+        _stamp(
+            item,
+            default_benchmark=default_benchmark,
+            default_algorithm=default_algorithm,
+            default_seed=default_seed,
+        )
         for item in metrics
     ]
     if not metrics:
@@ -293,11 +357,12 @@ def load_metrics_from_path(
     return metrics, None
 
 
-def metric_identity_key(item: CapturedMetric) -> tuple[str, str, str]:
-    """Unique key for one matrix cell: benchmark × algorithm × metric."""
+def metric_identity_key(item: CapturedMetric) -> tuple[str, str, str, str]:
+    """Unique key for one matrix cell: benchmark × algorithm × seed × metric."""
     return (
         item.benchmark.strip().lower(),
         item.algorithm.strip().lower(),
+        item.seed.strip().lower(),
         item.metric_name.strip().lower(),
     )
 

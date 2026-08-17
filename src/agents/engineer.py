@@ -12,7 +12,7 @@ from urllib import error, request
 from pydantic import ValidationError
 
 from src.agents.prompts.engineer_prompt import build_engineer_system_prompt
-from src.config import ENGINEER_MODEL, MODEL_NUM_PREDICT, MODEL_TEMPERATURE, OLLAMA_HOST
+from src.config import ENGINEER_MODEL, ENGINEER_NUM_PREDICT, MODEL_TEMPERATURE, OLLAMA_HOST
 from src.state import (
     AgentEnvelope,
     EngineerInputContext,
@@ -87,11 +87,76 @@ def _normalize_legacy_engineer_payload(payload: dict[str, object]) -> dict[str, 
     return data
 
 
+def _normalize_engineer_envelope(parsed: dict[str, object]) -> dict[str, object]:
+    """Coerce common LLM envelope mistakes before Pydantic validation."""
+    data = dict(parsed)
+    payload = data.get("payload")
+    if not isinstance(payload, dict):
+        return data
+    payload = dict(payload)
+    extensions = payload.get("extensions", {})
+    if not isinstance(extensions, dict):
+        payload["extensions"] = {}
+    core = payload.get("core")
+    if isinstance(core, dict):
+        core = dict(core)
+        patches_raw = core.get("patches", [])
+        normalized_patches: list[dict[str, str]] = []
+        if isinstance(patches_raw, list):
+            for patch in patches_raw:
+                if not isinstance(patch, dict):
+                    continue
+                action = str(patch.get("action", "")).strip().lower()
+                file_path = str(patch.get("file_path", "")).strip()
+                if action not in VALID_ACTIONS or not file_path:
+                    continue
+                content = str(patch.get("content", ""))
+                if action == "delete":
+                    content = ""
+                normalized_patches.append(
+                    {
+                        "file_path": file_path,
+                        "action": action,
+                        "content": content,
+                        "rationale": str(patch.get("rationale", "")).strip(),
+                    }
+                )
+        payload["core"] = {
+            "step_id": str(core.get("step_id", "")).strip(),
+            "detected_language": str(core.get("detected_language", "")).strip() or "python",
+            "patches": normalized_patches,
+            "verification_commands": _ensure_list_str(core.get("verification_commands")),
+        }
+    data["payload"] = payload
+    return data
+
+
+def _parse_engineer_response(raw_response: str) -> EngineerOutput:
+    parsed = json.loads(_clean_json_response(raw_response))
+    if not isinstance(parsed, dict):
+        raise json.JSONDecodeError("Engineer response must be a JSON object", raw_response, 0)
+    if parsed.get("schema_version") == "2.0":
+        envelope = AgentEnvelope[EngineerPayload].model_validate(_normalize_engineer_envelope(parsed))
+        if envelope.status == "blocked":
+            raise RuntimeError(
+                f"Engineer blocked. Unknowns: {envelope.unknowns}, Warnings: {envelope.warnings}"
+            )
+        if envelope.unknowns:
+            logger.warning("Engineer has unknowns: %s", envelope.unknowns)
+        if envelope.warnings:
+            logger.warning("Engineer warnings: %s", envelope.warnings)
+        return _convert_envelope_to_legacy_engineer(envelope)
+    logger.info("Parsing as legacy engineer format")
+    payload = parsed.get("payload")
+    if isinstance(payload, dict) and isinstance(payload.get("core"), dict):
+        parsed = _normalize_engineer_envelope(parsed)["payload"]["core"]  # type: ignore[index]
+    return EngineerOutput.model_validate(_normalize_legacy_engineer_payload(parsed))
+
+
 def _convert_envelope_to_legacy_engineer(envelope: AgentEnvelope[EngineerPayload]) -> EngineerOutput:
     """Convert new envelope structure to legacy EngineerOutput format."""
     core = envelope.payload.core
     ext = envelope.payload.extensions
-    
     return EngineerOutput(
         step_id=core.step_id,
         patches=core.patches,
@@ -107,18 +172,21 @@ class PaperEngineer:
     max_parse_retries: int = 1
 
     def _call_ollama_json(self, context: EngineerInputContext) -> EngineerOutput:
+        plan = context.execution_plan.payload
         system_prompt = build_engineer_system_prompt(
             domain_vocabulary_block=(
-                "- bayesian optimization\n"
-                "- objective value\n"
-                "- regret\n"
-                "- benchmark\n"
-                "- deterministic seed"
+                f"- domain: {plan.domain or 'unspecified'}\n"
+                f"- objective: {plan.objective or 'unspecified'}"
             )
         )
         payload = context.model_dump()
         prompt = f"""
 Generate a patch proposal for this single plan step.
+If the current phase kind is construct, create exactly the files in required_artifacts.
+Use one create patch per required file and include the full source for each file.
+Follow specification APIs exactly (required imports/calls, dims, bounds). Do not invent library internals.
+If failure_context is present, fix that traceback (including TypeError from wrong optimizer kwargs).
+Do not implement later execute-matrix rows; the runner will execute those commands.
 Keep changes minimal and directly tied to the goal.
 If failure_context is present, address that failure explicitly.
 
@@ -143,7 +211,7 @@ Context JSON:
                 "format": "json",
                 "options": {
                     "temperature": MODEL_TEMPERATURE,
-                    "num_predict": MODEL_NUM_PREDICT,
+                    "num_predict": ENGINEER_NUM_PREDICT,
                 },
             }
             logger.info("Engineer prompt payload: %s", json.dumps(req_payload, indent=2))
@@ -160,30 +228,7 @@ Context JSON:
                 logger.info("Engineer raw response: %s", raw_response)
                 if not raw_response.strip():
                     raise json.JSONDecodeError("Empty model response", "", 0)
-                parsed = json.loads(_clean_json_response(raw_response))
-                
-                # Try parsing as new envelope format first
-                if "schema_version" in parsed and parsed.get("schema_version") == "2.0":
-                    envelope = AgentEnvelope[EngineerPayload].model_validate(parsed)
-                    
-                    # Check status and log warnings/unknowns
-                    if envelope.status == "blocked":
-                        raise RuntimeError(
-                            f"Engineer blocked. Unknowns: {envelope.unknowns}, Warnings: {envelope.warnings}"
-                        )
-                    if envelope.unknowns:
-                        logger.warning("Engineer has unknowns: %s", envelope.unknowns)
-                    if envelope.warnings:
-                        logger.warning("Engineer warnings: %s", envelope.warnings)
-                    
-                    # Core fields are validated by Pydantic; extensions are optional
-                    # Convert to legacy format for backward compatibility
-                    return _convert_envelope_to_legacy_engineer(envelope)
-                else:
-                    # Fall back to legacy format
-                    logger.info("Parsing as legacy engineer format")
-                    normalized = _normalize_legacy_engineer_payload(parsed)
-                    return EngineerOutput.model_validate(normalized)
+                return _parse_engineer_response(raw_response)
             except (
                 json.JSONDecodeError,
                 error.URLError,

@@ -7,8 +7,8 @@ Two PoC projects for the research pipeline. Neither requires paper ingestion.
 From the repository root:
 
 ```bash
-python benchmark/setup_graph.py
-# writes benchmark/graphs.json (5 NetworkX-validated graphs + ground truth)
+python benchmark/setup_test_graph.py
+# writes benchmark/graphs.json (NetworkX-validated graphs + ground truth)
 
 python benchmark/run_all_graphs.py
 # writes benchmark/graph_tasks.json (5 Engineer tasks)

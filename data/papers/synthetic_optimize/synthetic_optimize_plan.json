@@ -1,0 +1,495 @@
+{
+  "paper": {
+    "paper_id": "synthetic_optimize",
+    "title": "Random Search vs Bayesian Optimization on Synthetic Benchmark Functions",
+    "pdf_path": null,
+    "arxiv_id": null
+  },
+  "plan_review": {
+    "status": "approved",
+    "notes": "Hand-written plan for run-plan PoC (Planner skipped)."
+  },
+  "source_extraction_path": "data/papers/synthetic_optimize/synthetic_optimize.json",
+  "plan_envelope": {
+    "schema_version": "2.0",
+    "agent": "planner",
+    "status": "ok",
+    "unknowns": [],
+    "warnings": [],
+    "payload": {
+      "plan_summary": "Engineer writes one CLI script. The runner then executes 20 seeded optimizer comparisons.",
+      "domain": "optimization",
+      "objective": "Evaluate Engineer's ability to implement one optimization CLI covering 5 functions and 2 optimizers. The runner executes the 20-run matrix.",
+      "results_summary_path": "",
+      "phases": [
+        {
+          "phase_id": "setup",
+          "title": "Install Python dependencies",
+          "kind": "setup",
+          "goal": "Install numpy, scikit-optimize, and scipy into the paper venv.",
+          "depends_on": [],
+          "variables": [],
+          "axes": {},
+          "run_template": "pip install numpy scipy scikit-optimize",
+          "matrix": [],
+          "planned_actions": "pip install numpy scipy scikit-optimize",
+          "results_path": ""
+        },
+        {
+          "phase_id": "engineer_code",
+          "title": "Engineer implements optimization suite",
+          "kind": "construct",
+          "goal": "Write one Python CLI, run_all.py, that prints one JSON metrics object to stdout.",
+          "depends_on": [
+            "setup"
+          ],
+          "input_paths": [
+            "run_all.py"
+          ],
+          "variables": [],
+          "axes": {},
+          "run_template": "",
+          "matrix": [],
+          "planned_actions": "Generate run_all.py. The runner captures stdout into metrics.json.",
+          "results_path": "",
+          "required_artifacts": [
+            "run_all.py"
+          ],
+          "acceptance_commands": [
+            "python run_all.py --function sphere --optimizer random_search --seed 0",
+            "python run_all.py --function ackley --optimizer bayesian_optimization --seed 0",
+            "python run_all.py --function griewank --optimizer random_search --seed 0"
+          ],
+          "specification": {
+            "benchmark_functions": {
+              "sphere": {
+                "formula": "sum(x_i^2)",
+                "dim": 5,
+                "bounds": [
+                  -5.12,
+                  5.12
+                ],
+                "global_minimum": 0
+              },
+              "rastrigin": {
+                "formula": "10n + sum(x_i^2 - 10*cos(2*pi*x_i))",
+                "dim": 5,
+                "bounds": [
+                  -5.12,
+                  5.12
+                ],
+                "global_minimum": 0
+              },
+              "ackley": {
+                "formula": "Ackley 2D: x = np.asarray(x); return -20*np.exp(-0.2*np.sqrt(0.5*np.sum(x**2))) - np.exp(0.5*np.sum(np.cos(2*np.pi*x))) + 20 + np.e",
+                "dim": 2,
+                "bounds": [
+                  -5,
+                  5
+                ],
+                "global_minimum": 0
+              },
+              "rosenbrock": {
+                "formula": "sum(100*(x_{i+1}-x_i^2)^2 + (1-x_i)^2)",
+                "dim": 5,
+                "bounds": [
+                  -2,
+                  2
+                ],
+                "global_minimum": 0
+              },
+              "griewank": {
+                "formula": "x = np.asarray(x).flatten(); return 1 + np.sum(x**2 / 4000) - np.prod(np.cos(x / np.sqrt(np.arange(1, len(x) + 1))))",
+                "dim": 5,
+                "bounds": [
+                  -600,
+                  600
+                ],
+                "global_minimum": 0
+              }
+            },
+            "required_functions": [
+              "sphere",
+              "rastrigin",
+              "ackley",
+              "rosenbrock",
+              "griewank"
+            ],
+            "dispatch": {
+              "lookup": "Use benchmark_functions[name] dim and bounds. bounds is [low, high] repeated dim times as Real(low, high). Never use func.__code__.co_argcount.",
+              "random_search": "random_search(func, dim, bounds, n_iterations=50, seed=seed)",
+              "bayesian_optimization": "bayesian_optimization(func, dim, bounds, n_calls=50, n_initial_points=10, seed=seed)",
+              "rule": "Branch on --optimizer. Never pass n_calls into random_search."
+            },
+            "random_search": {
+              "implementation": "np.random.uniform per dimension using that function's dim and bounds",
+              "n_iterations": 50
+            },
+            "bayesian_optimization": {
+              "required_import": "from skopt import gp_minimize",
+              "required_call": "gp_minimize(func, [Real(lo, hi)] * dim, n_calls=50, n_initial_points=10, random_state=seed)",
+              "forbidden": [
+                "skopt.gpr",
+                "sklearn.gaussian_process",
+                "scipy.optimize.minimize",
+                "scipy.optimize.minimize_scalar"
+              ]
+            },
+            "cli": {
+              "command": "python run_all.py --function sphere --optimizer random_search --seed 0",
+              "flags": [
+                "--function",
+                "--optimizer",
+                "--seed"
+              ],
+              "output": "Print json.dumps({function, optimizer, seed, simple_regret, final_value}) to stdout. Do not print a Python dict. Do not write files."
+            },
+            "output_json": {
+              "function": "string",
+              "optimizer": "string",
+              "seed": "int",
+              "simple_regret": "float, equals final_value because each global minimum is 0",
+              "final_value": "float, best objective found"
+            }
+          }
+        },
+        {
+          "phase_id": "synthetic_suite",
+          "title": "Execute optimization benchmark suite",
+          "kind": "execute",
+          "goal": "Run 20 complete optimization experiments: 5 functions \u00d7 2 optimizers \u00d7 2 seeds. Collect convergence metrics.",
+          "depends_on": [
+            "engineer_code"
+          ],
+          "variables": [
+            "function",
+            "optimizer",
+            "seed"
+          ],
+          "axes": {},
+          "run_template": "",
+          "matrix": [
+            {
+              "name": "sphere_random_seed0",
+              "variables": {
+                "function": "sphere",
+                "optimizer": "random_search",
+                "seed": 0
+              },
+              "run_command": "python run_all.py --function sphere --optimizer random_search --seed 0",
+              "results_path": "",
+              "metrics": [
+                "simple_regret",
+                "final_value"
+              ]
+            },
+            {
+              "name": "sphere_random_seed1",
+              "variables": {
+                "function": "sphere",
+                "optimizer": "random_search",
+                "seed": 1
+              },
+              "run_command": "python run_all.py --function sphere --optimizer random_search --seed 1",
+              "results_path": "",
+              "metrics": [
+                "simple_regret",
+                "final_value"
+              ]
+            },
+            {
+              "name": "sphere_bayesian_seed0",
+              "variables": {
+                "function": "sphere",
+                "optimizer": "bayesian_optimization",
+                "seed": 0
+              },
+              "run_command": "python run_all.py --function sphere --optimizer bayesian_optimization --seed 0",
+              "results_path": "",
+              "metrics": [
+                "simple_regret",
+                "final_value"
+              ]
+            },
+            {
+              "name": "sphere_bayesian_seed1",
+              "variables": {
+                "function": "sphere",
+                "optimizer": "bayesian_optimization",
+                "seed": 1
+              },
+              "run_command": "python run_all.py --function sphere --optimizer bayesian_optimization --seed 1",
+              "results_path": "",
+              "metrics": [
+                "simple_regret",
+                "final_value"
+              ]
+            },
+            {
+              "name": "rastrigin_random_seed0",
+              "variables": {
+                "function": "rastrigin",
+                "optimizer": "random_search",
+                "seed": 0
+              },
+              "run_command": "python run_all.py --function rastrigin --optimizer random_search --seed 0",
+              "results_path": "",
+              "metrics": [
+                "simple_regret",
+                "final_value"
+              ]
+            },
+            {
+              "name": "rastrigin_random_seed1",
+              "variables": {
+                "function": "rastrigin",
+                "optimizer": "random_search",
+                "seed": 1
+              },
+              "run_command": "python run_all.py --function rastrigin --optimizer random_search --seed 1",
+              "results_path": "",
+              "metrics": [
+                "simple_regret",
+                "final_value"
+              ]
+            },
+            {
+              "name": "rastrigin_bayesian_seed0",
+              "variables": {
+                "function": "rastrigin",
+                "optimizer": "bayesian_optimization",
+                "seed": 0
+              },
+              "run_command": "python run_all.py --function rastrigin --optimizer bayesian_optimization --seed 0",
+              "results_path": "",
+              "metrics": [
+                "simple_regret",
+                "final_value"
+              ]
+            },
+            {
+              "name": "rastrigin_bayesian_seed1",
+              "variables": {
+                "function": "rastrigin",
+                "optimizer": "bayesian_optimization",
+                "seed": 1
+              },
+              "run_command": "python run_all.py --function rastrigin --optimizer bayesian_optimization --seed 1",
+              "results_path": "",
+              "metrics": [
+                "simple_regret",
+                "final_value"
+              ]
+            },
+            {
+              "name": "ackley_random_seed0",
+              "variables": {
+                "function": "ackley",
+                "optimizer": "random_search",
+                "seed": 0
+              },
+              "run_command": "python run_all.py --function ackley --optimizer random_search --seed 0",
+              "results_path": "",
+              "metrics": [
+                "simple_regret",
+                "final_value"
+              ]
+            },
+            {
+              "name": "ackley_random_seed1",
+              "variables": {
+                "function": "ackley",
+                "optimizer": "random_search",
+                "seed": 1
+              },
+              "run_command": "python run_all.py --function ackley --optimizer random_search --seed 1",
+              "results_path": "",
+              "metrics": [
+                "simple_regret",
+                "final_value"
+              ]
+            },
+            {
+              "name": "ackley_bayesian_seed0",
+              "variables": {
+                "function": "ackley",
+                "optimizer": "bayesian_optimization",
+                "seed": 0
+              },
+              "run_command": "python run_all.py --function ackley --optimizer bayesian_optimization --seed 0",
+              "results_path": "",
+              "metrics": [
+                "simple_regret",
+                "final_value"
+              ]
+            },
+            {
+              "name": "ackley_bayesian_seed1",
+              "variables": {
+                "function": "ackley",
+                "optimizer": "bayesian_optimization",
+                "seed": 1
+              },
+              "run_command": "python run_all.py --function ackley --optimizer bayesian_optimization --seed 1",
+              "results_path": "",
+              "metrics": [
+                "simple_regret",
+                "final_value"
+              ]
+            },
+            {
+              "name": "rosenbrock_random_seed0",
+              "variables": {
+                "function": "rosenbrock",
+                "optimizer": "random_search",
+                "seed": 0
+              },
+              "run_command": "python run_all.py --function rosenbrock --optimizer random_search --seed 0",
+              "results_path": "",
+              "metrics": [
+                "simple_regret",
+                "final_value"
+              ]
+            },
+            {
+              "name": "rosenbrock_random_seed1",
+              "variables": {
+                "function": "rosenbrock",
+                "optimizer": "random_search",
+                "seed": 1
+              },
+              "run_command": "python run_all.py --function rosenbrock --optimizer random_search --seed 1",
+              "results_path": "",
+              "metrics": [
+                "simple_regret",
+                "final_value"
+              ]
+            },
+            {
+              "name": "rosenbrock_bayesian_seed0",
+              "variables": {
+                "function": "rosenbrock",
+                "optimizer": "bayesian_optimization",
+                "seed": 0
+              },
+              "run_command": "python run_all.py --function rosenbrock --optimizer bayesian_optimization --seed 0",
+              "results_path": "",
+              "metrics": [
+                "simple_regret",
+                "final_value"
+              ]
+            },
+            {
+              "name": "rosenbrock_bayesian_seed1",
+              "variables": {
+                "function": "rosenbrock",
+                "optimizer": "bayesian_optimization",
+                "seed": 1
+              },
+              "run_command": "python run_all.py --function rosenbrock --optimizer bayesian_optimization --seed 1",
+              "results_path": "",
+              "metrics": [
+                "simple_regret",
+                "final_value"
+              ]
+            },
+            {
+              "name": "griewank_random_seed0",
+              "variables": {
+                "function": "griewank",
+                "optimizer": "random_search",
+                "seed": 0
+              },
+              "run_command": "python run_all.py --function griewank --optimizer random_search --seed 0",
+              "results_path": "",
+              "metrics": [
+                "simple_regret",
+                "final_value"
+              ]
+            },
+            {
+              "name": "griewank_random_seed1",
+              "variables": {
+                "function": "griewank",
+                "optimizer": "random_search",
+                "seed": 1
+              },
+              "run_command": "python run_all.py --function griewank --optimizer random_search --seed 1",
+              "results_path": "",
+              "metrics": [
+                "simple_regret",
+                "final_value"
+              ]
+            },
+            {
+              "name": "griewank_bayesian_seed0",
+              "variables": {
+                "function": "griewank",
+                "optimizer": "bayesian_optimization",
+                "seed": 0
+              },
+              "run_command": "python run_all.py --function griewank --optimizer bayesian_optimization --seed 0",
+              "results_path": "",
+              "metrics": [
+                "simple_regret",
+                "final_value"
+              ]
+            },
+            {
+              "name": "griewank_bayesian_seed1",
+              "variables": {
+                "function": "griewank",
+                "optimizer": "bayesian_optimization",
+                "seed": 1
+              },
+              "run_command": "python run_all.py --function griewank --optimizer bayesian_optimization --seed 1",
+              "results_path": "",
+              "metrics": [
+                "simple_regret",
+                "final_value"
+              ]
+            }
+          ],
+          "planned_actions": "Execute 20 independent optimizer runs. Each run generates simple_regret and final_value metrics.",
+          "results_path": ""
+        }
+      ],
+      "assumptions": [
+        "Engineer writes one file, run_all.py, containing the 5 functions, both optimizers, and the CLI.",
+        "Global minima of all five functions are 0, so simple_regret equals final_value.",
+        "scikit-optimize library is available and used for Bayesian Optimization.",
+        "Random Search uses np.random with seed for reproducibility."
+      ],
+      "constraints": [
+        "CPU only.",
+        "Engineer timeout: 15 minutes (code generation).",
+        "Reviewer timeout: ~90 minutes for full 20-run suite (Bayesian Opt per run ~2-5 min).",
+        "Use each function's dim and bounds. Ackley is 2D; the others are 5D."
+      ],
+      "missing_context": [],
+      "verification_checks": [
+        "exit_code:0",
+        "generated_code_present",
+        "20_runs_complete"
+      ],
+      "risks": [
+        "Bayesian Opt tuning: Engineer may pick suboptimal kernel/acquisition; BO performance varies.",
+        "Runtime sensitivity: 20 runs \u00d7 50 iterations each = 1000 function evaluations; expect ~90 min.",
+        "Seed management: Engineer must seed both optimizers correctly for reproducibility."
+      ],
+      "organization": [],
+      "execution": [
+        "Setup, Engineer writes run_all.py, runner executes the 20-run matrix, metrics aggregated."
+      ],
+      "repo_usage": [
+        "python run_all.py --function sphere --optimizer random_search --seed 0"
+      ],
+      "engineer_notes": [
+        "Write only run_all.py. Implement all 5 functions: sphere, rastrigin, ackley, rosenbrock, griewank.",
+        "CLI: --function, --optimizer, --seed. Print json.dumps(...) to stdout. No files.",
+        "Branch on optimizer: random_search(..., n_iterations=50); bayesian_optimization(..., n_calls=50).",
+        "Bayesian optimization MUST call skopt.gp_minimize. Do not roll your own GP."
+      ]
+    }
+  }
+}

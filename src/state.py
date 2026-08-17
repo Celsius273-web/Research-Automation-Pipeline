@@ -222,6 +222,7 @@ class PlanPhase(BaseModel):
 
     phase_id: str
     title: str
+    kind: Literal["setup", "construct", "execute", "summary"] = "execute"
     goal: str = ""
     depends_on: list[str] = Field(default_factory=list)
     variables: list[str] = Field(default_factory=list)
@@ -230,6 +231,10 @@ class PlanPhase(BaseModel):
     matrix: list[PhaseRunSpec] = Field(default_factory=list)
     planned_actions: str = ""
     results_path: str = ""
+    input_paths: list[str] = Field(default_factory=list)
+    required_artifacts: list[str] = Field(default_factory=list)
+    acceptance_commands: list[str] = Field(default_factory=list)
+    specification: dict[str, Any] = Field(default_factory=dict)
 
 
 class ExperimentSpec(BaseModel):
@@ -394,6 +399,7 @@ class CapturedMetric(BaseModel):
 
     benchmark: str = ""
     algorithm: str = ""
+    seed: str = ""
     metric_name: str
     value: float | str
     source: str = ""
@@ -418,6 +424,7 @@ class MetricsDocument(BaseModel):
     exit_code: int = 1
     attempts: int = 0
     timestamp: str = ""
+    generated_code: dict[str, str] = Field(default_factory=dict)
     metrics: list[CapturedMetric] = Field(default_factory=list)
     experiment_matrix: list[ExperimentMatrixRow] = Field(default_factory=list)
     logs_captured: bool = False

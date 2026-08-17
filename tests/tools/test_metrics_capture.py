@@ -5,8 +5,32 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from src.tools.metrics_capture import load_metrics_from_path, merge_unique_metrics
+from src.tools.metrics_capture import (
+    load_metrics_from_path,
+    load_metrics_from_text,
+    merge_unique_metrics,
+)
 from src.state import CapturedMetric
+
+def test_load_metrics_from_stdout_object() -> None:
+    metrics, error = load_metrics_from_text(
+        json.dumps(
+            {
+                "function": "sphere",
+                "optimizer": "random_search",
+                "seed": 0,
+                "simple_regret": 0.4,
+                "final_value": 0.4,
+            }
+        ),
+        default_benchmark="sphere",
+    )
+    assert error is None
+    names = {item.metric_name: item.value for item in metrics}
+    assert names["simple_regret"] == 0.4
+    assert names["final_value"] == 0.4
+    assert metrics[0].algorithm == "random_search"
+    assert metrics[0].seed == "0"
 
 
 def test_load_metrics_from_json_list(tmp_path: Path) -> None:
@@ -70,6 +94,28 @@ def test_merge_keeps_distinct_algorithms() -> None:
     by_algo = {item.algorithm: item.value for item in merged}
     assert by_algo["be-cbo"] == 1.0
     assert by_algo["cei"] == 2.0
+
+
+def test_optimization_metrics_keep_optimizer_and_seed(tmp_path: Path) -> None:
+    path = tmp_path / "run.json"
+    path.write_text(
+        json.dumps(
+            {
+                "function": "sphere",
+                "optimizer": "random_search",
+                "seed": 1,
+                "simple_regret": 0.25,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    metrics, error = load_metrics_from_path(path, default_benchmark="sphere")
+
+    assert error is None
+    assert [(item.algorithm, item.seed, item.metric_name) for item in metrics] == [
+        ("random_search", "1", "simple_regret")
+    ]
 
 
 def test_load_metrics_from_pickle_stem(tmp_path: Path) -> None:

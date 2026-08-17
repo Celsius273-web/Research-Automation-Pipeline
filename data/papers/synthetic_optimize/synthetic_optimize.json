@@ -1,0 +1,41 @@
+{
+  "paper": {
+    "paper_id": "synthetic_optimize",
+    "title": "Random Search vs Bayesian Optimization on Synthetic Benchmark Functions",
+    "pdf_path": "benchmark/papers/optimize.md",
+    "arxiv_id": null
+  },
+  "review": {
+    "status": "approved",
+    "notes": "Hand-written extraction for run-plan PoC (Analyst skipped)."
+  },
+  "by_section": {},
+  "merged": {
+    "research_question": "Can an AI system implement and orchestrate a complete optimization benchmark comparing Random Search vs Bayesian Optimization?",
+    "paper_overview": "An optimization benchmark suite compares Random Search and Bayesian Optimization across five synthetic functions.",
+    "methodology": "Engineer implements one CLI. The runner executes the seeded optimizer matrix and captures stdout metrics.",
+    "datasets_or_benchmarks": ["sphere", "rastrigin", "ackley", "rosenbrock", "griewank"],
+    "variables": ["optimizer", "benchmark_function", "seed", "n_iterations"],
+    "hyperparameters": {
+      "n_iterations": "50",
+      "n_seeds": "2",
+      "n_initial_points_bo": "10",
+      "kernel": "Matern 5/2",
+      "acquisition_function": "Expected Improvement"
+    },
+    "evaluation_metrics": ["simple_regret", "final_value"],
+    "reported_results": [
+      {"benchmark": "sphere", "algorithm": "random_search", "metric_name": "simple_regret", "value": "10.9768", "source": "benchmark/papers/synthetic_optimize.md Table 1"},
+      {"benchmark": "sphere", "algorithm": "bayesian_optimization", "metric_name": "simple_regret", "value": "0.0029", "source": "benchmark/papers/synthetic_optimize.md Table 1"},
+      {"benchmark": "rastrigin", "algorithm": "random_search", "metric_name": "simple_regret", "value": "48.4342", "source": "benchmark/papers/synthetic_optimize.md Table 1"},
+      {"benchmark": "rastrigin", "algorithm": "bayesian_optimization", "metric_name": "simple_regret", "value": "32.7766", "source": "benchmark/papers/synthetic_optimize.md Table 1"},
+      {"benchmark": "ackley", "algorithm": "random_search", "metric_name": "simple_regret", "value": "3.6163", "source": "benchmark/papers/synthetic_optimize.md Table 1"},
+      {"benchmark": "ackley", "algorithm": "bayesian_optimization", "metric_name": "simple_regret", "value": "0.1462", "source": "benchmark/papers/synthetic_optimize.md Table 1"},
+      {"benchmark": "rosenbrock", "algorithm": "random_search", "metric_name": "simple_regret", "value": "256.6105", "source": "benchmark/papers/synthetic_optimize.md Table 1"},
+      {"benchmark": "rosenbrock", "algorithm": "bayesian_optimization", "metric_name": "simple_regret", "value": "16.8361", "source": "benchmark/papers/synthetic_optimize.md Table 1"},
+      {"benchmark": "griewank", "algorithm": "random_search", "metric_name": "simple_regret", "value": "38.5694", "source": "benchmark/papers/synthetic_optimize.md Table 1"},
+      {"benchmark": "griewank", "algorithm": "bayesian_optimization", "metric_name": "simple_regret", "value": "0.7424", "source": "benchmark/papers/synthetic_optimize.md Table 1"}
+    ],
+    "notes": "Reviewer grades Engineer captures against benchmark Table 1 means via benchmark_expectations."
+  }
+}

@@ -15,9 +15,9 @@ from src.config import ENGINEER_METRICS_FILENAME, REVIEWER_REPORT_FILENAME, ROOT
 from src.persistence import (
     load_metrics_document,
     load_planner_envelope,
-    load_reported_results,
     persist_reviewer_run_report,
 )
+from src.tools.benchmark_expectations import resolve_review_expectations
 from src.state import (
     AgentEnvelope,
     ExtractionBundle,
@@ -95,7 +95,7 @@ def _write_reviewer_report(
     run_dir: Path,
     metrics_doc: MetricsDocument,
 ) -> Path:
-    reported = load_reported_results(bundle.extraction_path)
+    reported = resolve_review_expectations(paper_id, bundle.extraction_path)
     report = PaperReviewer.compare_reported_to_captured(
         reported,
         metrics_doc.metrics,
@@ -109,17 +109,17 @@ def run_saved_plan(
     *,
     plan_path: str,
     paper_id: str,
-    repo_path: str,
+    repo_path: str | None,
     non_interactive: bool = True,
 ) -> int:
     """Skip Analyst/Planner; run Engineer/Executor then Reviewer from a saved plan."""
     _ = non_interactive
     source = Path(plan_path).expanduser().resolve()
-    repo = Path(repo_path).expanduser().resolve()
+    repo = Path(repo_path).expanduser().resolve() if repo_path else None
     if not source.exists():
         logger.error("Plan file does not exist: %s", source)
         return 1
-    if not repo.exists():
+    if repo is not None and not repo.exists():
         logger.error("Repository path does not exist: %s", repo)
         return 1
 
@@ -131,7 +131,7 @@ def run_saved_plan(
         runner = ExperimentRunner(docker_executor=DockerExecutor(project_root=ROOT_DIR))
         metrics_doc, run_dir = runner.execute_paper(
             paper_id=paper_id,
-            repo_path=str(repo),
+            repo_path=str(repo) if repo is not None else None,
             plan_path=source,
         )
     except (FileNotFoundError, ValueError, ValidationError, json.JSONDecodeError) as exc:

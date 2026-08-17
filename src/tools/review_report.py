@@ -1,4 +1,4 @@
-"""Deterministic Reviewer report from extraction reported_results vs Engineer metrics."""
+"""Deterministic Reviewer report from benchmark or extraction expectations vs Engineer metrics."""
 
 from __future__ import annotations
 

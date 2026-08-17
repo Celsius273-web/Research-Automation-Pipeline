@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 from src.agents.experiment_runner import ExperimentRunner
 from src.agents.executor import ExecutorAgent
-from src.state import RepoContext
+from src.state import EngineerOutput, PatchProposal, RepoContext
 from src.tools.docker_executor import DockerExecutor
 
 
@@ -211,6 +211,290 @@ def test_experiment_runner_retries_then_fails(monkeypatch, tmp_path: Path) -> No
     assert len(fake_client.commands) == 3
 
 
+def test_experiment_runner_constructs_code_into_metrics(monkeypatch, tmp_path: Path) -> None:
+    fake_client = _FakeDockerClient(status_code=0)
+    _monkeypatch_docker(monkeypatch, fake_client)
+
+    class _FakeEngineer:
+        def propose_patch(self, context):
+            phases = context.execution_plan.payload.phases
+            assert [phase.phase_id for phase in phases] == ["engineer_code"]
+            assert phases[0].specification == {"functions": ["solve"]}
+            return EngineerOutput(
+                step_id="engineer_code",
+                patches=[
+                    PatchProposal(
+                        file_path="solution.py",
+                        action="create",
+                        content="def solve():\n    return 42\n",
+                    )
+                ],
+            )
+
+    paper_id = "construct_paper"
+    papers_dir = tmp_path / "papers" / paper_id
+    code_dir = papers_dir / "code"
+    code_dir.mkdir(parents=True)
+    (code_dir / "requirements.txt").write_text("", encoding="utf-8")
+    plan = {
+        "plan_envelope": {
+            "schema_version": "2.0",
+            "agent": "planner",
+            "status": "ok",
+            "unknowns": [],
+            "warnings": [],
+            "payload": {
+                "domain": "test",
+                "phases": [
+                    {
+                        "phase_id": "setup",
+                        "title": "Setup",
+                        "kind": "setup",
+                        "run_template": "pip install -r requirements.txt",
+                    },
+                    {
+                        "phase_id": "engineer_code",
+                        "title": "Construct",
+                        "kind": "construct",
+                        "depends_on": ["setup"],
+                        "input_paths": ["requirements.txt"],
+                        "required_artifacts": ["solution.py"],
+                        "acceptance_commands": ["python -m py_compile solution.py"],
+                        "specification": {"functions": ["solve"]},
+                    },
+                ],
+            },
+        }
+    }
+    plan_path = papers_dir / f"{paper_id}_plan.json"
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+    import src.bundle as bundle_mod
+
+    monkeypatch.setattr(bundle_mod, "PAPER_BUNDLES_DIR", tmp_path / "papers")
+    monkeypatch.setattr("src.agents.experiment_runner.available_memory_gb", lambda: 8.0)
+    monkeypatch.setattr("src.agents.experiment_runner.ROOT_DIR", tmp_path)
+    dockerfile = tmp_path / "docker" / "python.Dockerfile"
+    dockerfile.parent.mkdir(parents=True)
+    dockerfile.write_text("FROM python:3.11-slim\n", encoding="utf-8")
+
+    runner = ExperimentRunner(
+        docker_executor=DockerExecutor(project_root=tmp_path),
+        engineer=_FakeEngineer(),  # type: ignore[arg-type]
+    )
+    metrics_doc, run_dir = runner.execute_paper(paper_id=paper_id)
+
+    assert metrics_doc.run_status == "SUCCESS"
+    assert metrics_doc.generated_code == {"solution.py": "def solve():\n    return 42\n"}
+    assert not (run_dir / "_workspace").exists()
+    persisted = json.loads((run_dir / "metrics.json").read_text(encoding="utf-8"))
+    assert persisted["generated_code"]["solution.py"].startswith("def solve")
+
+
+def test_construct_uses_reference_artifacts_without_llm(monkeypatch, tmp_path: Path) -> None:
+    fake_client = _FakeDockerClient(status_code=0)
+    _monkeypatch_docker(monkeypatch, fake_client)
+
+    class _UnexpectedEngineer:
+        def propose_patch(self, context):
+            raise AssertionError("Engineer should not run when reference artifacts are staged")
+
+    paper_id = "reference_paper"
+    papers_dir = tmp_path / "papers" / paper_id
+    code_dir = papers_dir / "code"
+    code_dir.mkdir(parents=True)
+    reference = "print('reference')\n"
+    (code_dir / "run_all.py").write_text(reference, encoding="utf-8")
+    plan = {
+        "plan_envelope": {
+            "schema_version": "2.0",
+            "agent": "planner",
+            "status": "ok",
+            "unknowns": [],
+            "warnings": [],
+            "payload": {
+                "domain": "test",
+                "phases": [
+                    {
+                        "phase_id": "setup",
+                        "title": "Setup",
+                        "kind": "setup",
+                        "run_template": "true",
+                    },
+                    {
+                        "phase_id": "engineer_code",
+                        "title": "Construct",
+                        "kind": "construct",
+                        "depends_on": ["setup"],
+                        "input_paths": ["run_all.py"],
+                        "required_artifacts": ["run_all.py"],
+                        "acceptance_commands": ["python -m py_compile run_all.py"],
+                    },
+                ],
+            },
+        }
+    }
+    plan_path = papers_dir / f"{paper_id}_plan.json"
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+    import src.bundle as bundle_mod
+
+    monkeypatch.setattr(bundle_mod, "PAPER_BUNDLES_DIR", tmp_path / "papers")
+    monkeypatch.setattr("src.agents.experiment_runner.available_memory_gb", lambda: 8.0)
+    monkeypatch.setattr("src.agents.experiment_runner.ROOT_DIR", tmp_path)
+    dockerfile = tmp_path / "docker" / "python.Dockerfile"
+    dockerfile.parent.mkdir(parents=True)
+    dockerfile.write_text("FROM python:3.11-slim\n", encoding="utf-8")
+
+    runner = ExperimentRunner(
+        docker_executor=DockerExecutor(project_root=tmp_path),
+        engineer=_UnexpectedEngineer(),  # type: ignore[arg-type]
+    )
+    metrics_doc, _run_dir = runner.execute_paper(paper_id=paper_id)
+
+    assert metrics_doc.run_status == "SUCCESS"
+    assert metrics_doc.generated_code == {"run_all.py": reference}
+
+
+def test_construct_retries_after_acceptance_type_error(monkeypatch, tmp_path: Path) -> None:
+    class _FlakyClient(_FakeDockerClient):
+        def __init__(self) -> None:
+            super().__init__(status_code=0)
+            self.smoke_failures_left = 1
+
+        def _run(self, image, command=None, **_kwargs):
+            _ = image
+            cmd = command[2] if command and len(command) >= 3 else ""
+            self.commands.append(cmd)
+            if "run_all.py" in cmd and self.smoke_failures_left > 0:
+                self.smoke_failures_left -= 1
+                container = _FakeContainer(
+                    status_code=1,
+                    stderr="TypeError: random_search() got an unexpected keyword argument 'n_calls'\n",
+                )
+            else:
+                container = _FakeContainer(status_code=0)
+            self.last_container = container
+            return container
+
+    class _RetryEngineer:
+        def __init__(self) -> None:
+            self.calls = 0
+            self.saw_failure = False
+
+        def propose_patch(self, context):
+            self.calls += 1
+            if context.failure_context is not None:
+                self.saw_failure = True
+            return EngineerOutput(
+                step_id="engineer_code",
+                patches=[
+                    PatchProposal(
+                        file_path="run_all.py",
+                        action="create",
+                        content=f"print({self.calls})\n",
+                    )
+                ],
+            )
+
+    fake_client = _FlakyClient()
+    _monkeypatch_docker(monkeypatch, fake_client)
+    paper_id = "retry_paper"
+    papers_dir = tmp_path / "papers" / paper_id
+    code_dir = papers_dir / "code"
+    code_dir.mkdir(parents=True)
+    (code_dir / "requirements.txt").write_text("", encoding="utf-8")
+    plan = {
+        "plan_envelope": {
+            "schema_version": "2.0",
+            "agent": "planner",
+            "status": "ok",
+            "unknowns": [],
+            "warnings": [],
+            "payload": {
+                "phases": [
+                    {
+                        "phase_id": "setup",
+                        "title": "Setup",
+                        "kind": "setup",
+                        "run_template": "pip install -r requirements.txt",
+                    },
+                    {
+                        "phase_id": "engineer_code",
+                        "title": "Construct",
+                        "kind": "construct",
+                        "depends_on": ["setup"],
+                        "input_paths": ["requirements.txt"],
+                        "required_artifacts": ["run_all.py"],
+                        "acceptance_commands": ["python run_all.py --function sphere --optimizer random_search"],
+                    },
+                ]
+            },
+        }
+    }
+    (papers_dir / f"{paper_id}_plan.json").write_text(json.dumps(plan), encoding="utf-8")
+
+    import src.bundle as bundle_mod
+
+    monkeypatch.setattr(bundle_mod, "PAPER_BUNDLES_DIR", tmp_path / "papers")
+    monkeypatch.setattr("src.agents.experiment_runner.available_memory_gb", lambda: 8.0)
+    monkeypatch.setattr("src.agents.experiment_runner.ROOT_DIR", tmp_path)
+    dockerfile = tmp_path / "docker" / "python.Dockerfile"
+    dockerfile.parent.mkdir(parents=True)
+    dockerfile.write_text("FROM python:3.11-slim\n", encoding="utf-8")
+
+    engineer = _RetryEngineer()
+    runner = ExperimentRunner(
+        docker_executor=DockerExecutor(project_root=tmp_path),
+        engineer=engineer,  # type: ignore[arg-type]
+        max_attempts=3,
+    )
+    metrics_doc, run_dir = runner.execute_paper(paper_id=paper_id)
+
+    assert engineer.calls == 2
+    assert engineer.saw_failure is True
+    assert metrics_doc.run_status == "SUCCESS"
+    log_text = (run_dir / "engineer.log").read_text(encoding="utf-8")
+    assert "requesting engineer patch" in log_text
+
+
+def test_experiment_runner_rejects_empty_execute_phase(monkeypatch, tmp_path: Path) -> None:
+    fake_client = _FakeDockerClient(status_code=0)
+    _monkeypatch_docker(monkeypatch, fake_client)
+    paper_id = "empty_paper"
+    papers_dir = tmp_path / "papers" / paper_id
+    code_dir = papers_dir / "code"
+    code_dir.mkdir(parents=True)
+    plan = {
+        "plan_envelope": {
+            "schema_version": "2.0",
+            "agent": "planner",
+            "status": "ok",
+            "unknowns": [],
+            "warnings": [],
+            "payload": {
+                "phases": [
+                    {"phase_id": "engineer_code", "title": "Empty", "kind": "execute"}
+                ]
+            },
+        }
+    }
+    plan_path = papers_dir / f"{paper_id}_plan.json"
+    plan_path.write_text(json.dumps(plan), encoding="utf-8")
+
+    import src.bundle as bundle_mod
+
+    monkeypatch.setattr(bundle_mod, "PAPER_BUNDLES_DIR", tmp_path / "papers")
+    monkeypatch.setattr("src.agents.experiment_runner.available_memory_gb", lambda: 8.0)
+    runner = ExperimentRunner(docker_executor=DockerExecutor(project_root=tmp_path))
+
+    metrics_doc, _ = runner.execute_paper(paper_id=paper_id)
+
+    assert metrics_doc.run_status == "FAILED"
+    assert metrics_doc.phases_failed == ["engineer_code"]
+    assert "no work configured" in metrics_doc.errors[0]
+
+
 def test_experiment_runner_continues_after_row_failure(monkeypatch, tmp_path: Path) -> None:
     class _SelectiveClient(_FakeDockerClient):
         def _run(self, image, command=None, **_kwargs):
@@ -294,6 +578,82 @@ def test_experiment_runner_continues_after_row_failure(monkeypatch, tmp_path: Pa
     assert any(m.metric_name == "regret" for m in metrics_doc.metrics)
     log_text = (run_dir / "engineer.log").read_text(encoding="utf-8")
     assert "continuing to next row" in log_text
+
+
+def test_experiment_runner_stops_on_fatal_import_error(monkeypatch, tmp_path: Path) -> None:
+    class _FatalClient(_FakeDockerClient):
+        def _run(self, image, command=None, **_kwargs):
+            _ = image
+            cmd = command[2] if command and len(command) >= 3 else ""
+            self.commands.append(cmd)
+            container = _FakeContainer(
+                status_code=1,
+                stderr="AttributeError: module 'skopt' has no attribute 'gpr'\n",
+            )
+            self.last_container = container
+            return container
+
+    fake_client = _FatalClient()
+    _monkeypatch_docker(monkeypatch, fake_client)
+
+    paper_id = "fatal_paper"
+    papers_dir = tmp_path / "papers" / paper_id
+    code_dir = papers_dir / "code"
+    code_dir.mkdir(parents=True)
+    (code_dir / "requirements.txt").write_text("numpy\n", encoding="utf-8")
+    plan = {
+        "plan_envelope": {
+            "schema_version": "2.0",
+            "agent": "planner",
+            "status": "ok",
+            "unknowns": [],
+            "warnings": [],
+            "payload": {
+                "phases": [
+                    {
+                        "phase_id": "suite",
+                        "title": "Suite",
+                        "kind": "execute",
+                        "matrix": [
+                            {
+                                "name": "first",
+                                "run_command": "python run_all.py --seed 0",
+                                "results_path": "results/a.json",
+                            },
+                            {
+                                "name": "second",
+                                "run_command": "python run_all.py --seed 1",
+                                "results_path": "results/b.json",
+                            },
+                        ],
+                    }
+                ],
+            },
+        }
+    }
+    (papers_dir / f"{paper_id}_plan.json").write_text(json.dumps(plan), encoding="utf-8")
+
+    import src.bundle as bundle_mod
+
+    monkeypatch.setattr(bundle_mod, "PAPER_BUNDLES_DIR", tmp_path / "papers")
+    monkeypatch.setattr("src.agents.experiment_runner.available_memory_gb", lambda: 8.0)
+    monkeypatch.setattr("src.agents.experiment_runner.ROOT_DIR", tmp_path)
+    dockerfile = tmp_path / "docker" / "python.Dockerfile"
+    dockerfile.parent.mkdir(parents=True, exist_ok=True)
+    dockerfile.write_text("FROM python:3.11-slim\n", encoding="utf-8")
+
+    runner = ExperimentRunner(
+        docker_executor=DockerExecutor(project_root=tmp_path),
+        max_attempts=3,
+    )
+    metrics_doc, run_dir = runner.execute_paper(paper_id=paper_id)
+
+    assert len(fake_client.commands) == 1
+    assert metrics_doc.attempts == 1
+    assert metrics_doc.run_status == "FAILED"
+    log_text = (run_dir / "engineer.log").read_text(encoding="utf-8")
+    assert "not retrying" in log_text
+    assert "skipping remaining rows" in log_text
 
 
 def test_experiment_runner_skips_on_low_memory(monkeypatch, tmp_path: Path) -> None:

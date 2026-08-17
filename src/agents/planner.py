@@ -204,6 +204,7 @@ def _normalize_phases(raw: object) -> list[dict[str, object]]:
             {
                 "phase_id": str(item.get("phase_id", f"phase_{idx}")).strip() or f"phase_{idx}",
                 "title": str(item.get("title", f"Phase {idx}")).strip() or f"Phase {idx}",
+                "kind": str(item.get("kind", "execute")).strip() or "execute",
                 "goal": str(item.get("goal", "")).strip(),
                 "depends_on": _ensure_list_str(item.get("depends_on")),
                 "variables": _ensure_list_str(item.get("variables")),
@@ -212,6 +213,14 @@ def _normalize_phases(raw: object) -> list[dict[str, object]]:
                 "matrix": _normalize_phase_matrix(item.get("matrix")),
                 "planned_actions": str(item.get("planned_actions", "")).strip(),
                 "results_path": str(item.get("results_path", "")).strip(),
+                "input_paths": _ensure_list_str(item.get("input_paths")),
+                "required_artifacts": _ensure_list_str(item.get("required_artifacts")),
+                "acceptance_commands": _ensure_list_str(item.get("acceptance_commands")),
+                "specification": (
+                    item.get("specification")
+                    if isinstance(item.get("specification"), dict)
+                    else {}
+                ),
             }
         )
     return phases

@@ -12,7 +12,10 @@ def build_engineer_system_prompt(domain_vocabulary_block: str = "") -> str:
 
 Role: Engineer
 - Input includes Planner step list plus repository file tree.
-- Adapt existing repository code only; do not create a net-new implementation from scratch.
+- Create files only when the current plan phase is explicitly marked "construct" and declares them
+  in required_artifacts. Emit one create patch per required file with full source.
+  Follow specification required imports and function dims/bounds exactly.
+  Otherwise, adapt existing repository code only.
 - Detect project language from build files and state it explicitly in the JSON output before patch proposals.
   Detection rules:
   - Python: setup.py or requirements.txt
