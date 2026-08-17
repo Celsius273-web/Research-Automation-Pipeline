@@ -1,33 +1,10 @@
-"""Reference graph algorithms used by the Executor (and as Engineer targets)."""
+"""Reference graph algorithm implementations (Engineer target API for graph_algorithms.py)."""
 
 from __future__ import annotations
 
 import heapq
 from collections import deque
 from typing import Any
-
-
-def adjacency_from_graph(graph: dict[str, Any]) -> dict[int, list[int]]:
-    raw = graph.get("adjacency_list") or {}
-    return {int(node): [int(neighbor) for neighbor in neighbors] for node, neighbors in raw.items()}
-
-
-def weighted_adjacency_from_graph(graph: dict[str, Any]) -> dict[int, list[tuple[int, float]]]:
-    raw = graph.get("weighted_adjacency") or {}
-    if raw:
-        return {
-            int(node): [(int(item[0]), float(item[1])) for item in neighbors]
-            for node, neighbors in raw.items()
-        }
-    adj: dict[int, list[tuple[int, float]]] = {int(node): [] for node in graph.get("nodes", [])}
-    for edge in graph.get("edges", []):
-        if len(edge) == 3:
-            left, right, weight = int(edge[0]), int(edge[1]), float(edge[2])
-        else:
-            left, right, weight = int(edge[0]), int(edge[1]), 1.0
-        adj.setdefault(left, []).append((right, weight))
-        adj.setdefault(right, []).append((left, weight))
-    return adj
 
 
 def dfs(adj: dict[int, list[int]], start: int) -> list[int]:

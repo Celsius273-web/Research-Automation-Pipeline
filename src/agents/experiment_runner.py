@@ -61,6 +61,26 @@ def _write_json(path: Path, payload: dict) -> None:
         os.fsync(handle.fileno())
 
 
+def _sanitize_step_id(step_id: str) -> str:
+    return "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in step_id)
+
+
+def _clip_log(text: str, max_chars: int = EXECUTOR_LOG_MAX_CHARS) -> str:
+    stripped = text.strip()
+    if len(stripped) <= max_chars:
+        return stripped
+    return stripped[-max_chars:]
+
+
+def _format_command_streams(stdout: str, stderr: str) -> str:
+    parts: list[str] = []
+    if stderr.strip():
+        parts.append(f"STDERR:\n{_clip_log(stderr)}")
+    if stdout.strip():
+        parts.append(f"STDOUT:\n{_clip_log(stdout)}")
+    return "\n".join(parts) if parts else "(no stdout or stderr)"
+
+
 @dataclass
 class ExperimentRunner:
     """Execute a Planner payload phase-by-phase inside Docker (CPU only)."""
@@ -286,14 +306,13 @@ class ExperimentRunner:
                     if is_fatal:
                         self._log(
                             log_path,
-                            f"Fatal script error for {row_name}; skipping remaining rows.",
+                            f"Fatal script error for {row_name}; continuing to next row.",
                         )
-                        self._persist_metrics(metrics_path, metrics_doc)
-                        break
-                    self._log(
-                        log_path,
-                        f"Command failed for {row_name}; capturing stderr and continuing to next row.",
-                    )
+                    else:
+                        self._log(
+                            log_path,
+                            f"Command failed for {row_name}; capturing stderr and continuing to next row.",
+                        )
                     self._persist_metrics(metrics_path, metrics_doc)
                     continue
 
@@ -321,7 +340,7 @@ class ExperimentRunner:
                             metrics_doc=metrics_doc,
                             log_path=log_path,
                         )
-                elif stdout_error:
+                elif stdout_error and phase.kind not in {"setup", "construct"}:
                     self._log(log_path, f"No metrics captured: {stdout_error}")
                     metrics_doc.errors.append(stdout_error)
                 self._record_matrix_row(
@@ -557,7 +576,9 @@ class ExperimentRunner:
         last_result: ContainerRunResult | None = None
         for attempt in range(1, self.max_attempts + 1):
             metrics_doc.attempts = max(metrics_doc.attempts, attempt)
-            attempt_log = run_dir / f"engineer_attempt_{attempt}.log"
+            attempt_log = (
+                run_dir / f"engineer_attempt_{attempt}_{_sanitize_step_id(step_id)}.log"
+            )
             self._log(log_path, f"Attempt {attempt}/{self.max_attempts} step={step_id} cmd={command!r}")
             result = executor.run_container_command(
                 repo_context=repo_context,
@@ -565,10 +586,10 @@ class ExperimentRunner:
                 timeout_seconds=self.timeout_seconds,
             )
             last_result = result
+            streams = _format_command_streams(result.stdout, result.stderr)
             excerpt = (
                 f"$ {command}\nexit_code={result.exit_code} timed_out={result.timed_out} "
-                f"runtime_seconds={result.runtime_seconds:.2f}\n\n"
-                f"STDOUT:\n{result.stdout}\n\nSTDERR:\n{result.stderr}\n"
+                f"runtime_seconds={result.runtime_seconds:.2f}\n\n{streams}\n"
             )
             attempt_log.write_text(excerpt, encoding="utf-8")
             self._log(
@@ -577,20 +598,24 @@ class ExperimentRunner:
                 f"runtime={result.runtime_seconds:.2f}s",
             )
             if result.exit_code != 0:
+                self._log(log_path, f"FAILED step={step_id} wrote {attempt_log.name}\n{streams}")
                 logger.warning(
-                    "FAILED ATTEMPT %s/%s: %s\nSTDOUT:\n%s\nSTDERR:\n%s",
+                    "FAILED ATTEMPT %s/%s: %s\n%s",
                     attempt,
                     self.max_attempts,
                     step_id,
-                    result.stdout,
-                    result.stderr,
+                    streams,
                 )
             metrics_doc.exit_code = result.exit_code if not result.timed_out else 124
             self._persist_metrics(metrics_path, metrics_doc)
             if result.exit_code == 0 and not result.timed_out:
                 return True, False, excerpt, result.stdout
             reason = "timeout" if result.timed_out else f"exit_code={result.exit_code}"
-            metrics_doc.errors.append(f"{step_id} attempt {attempt} failed ({reason})")
+            detail = _clip_log(result.stderr or result.stdout, max_chars=500)
+            metrics_doc.errors.append(
+                f"{step_id} attempt {attempt} failed ({reason})"
+                + (f": {detail}" if detail else "")
+            )
             if self._is_fatal_command_error(result):
                 self._log(log_path, f"Fatal script error for step={step_id}; not retrying.")
                 return False, True, excerpt, result.stdout

@@ -9,7 +9,7 @@ venv/
 md/
 .env
 *.env
-
+/data
 .DS_Store
 *.egg-info/
 

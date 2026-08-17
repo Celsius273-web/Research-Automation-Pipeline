@@ -9,15 +9,8 @@ BENCHMARK_DIR = Path(__file__).resolve().parents[2] / "benchmark"
 if str(BENCHMARK_DIR) not in sys.path:
     sys.path.insert(0, str(BENCHMARK_DIR))
 
-from graph_algorithms import (  # noqa: E402
-    adjacency_from_graph,
-    bfs,
-    dfs,
-    dijkstra,
-    floyd_warshall,
-    kruskal_mst_weight,
-    weighted_adjacency_from_graph,
-)
+from graph_algorithms import bfs, dfs, dijkstra, floyd_warshall, kruskal_mst_weight  # noqa: E402
+from graph_utils import adjacency_from_graph, weighted_adjacency_from_graph  # noqa: E402
 from run_graph import run_algorithm  # noqa: E402
 from setup_graph import create_test_graphs  # noqa: E402
 
@@ -28,6 +21,17 @@ def test_dfs_and_bfs_match_simple_undirected_ground_truth() -> None:
     adj = adjacency_from_graph(simple)
     assert dfs(adj, 0) == simple["ground_truth"]["dfs_order_from_0"]
     assert bfs(adj, 0) == simple["ground_truth"]["bfs_order_from_0"]
+
+
+def test_weighted_adjacency_is_neighbor_weight_pairs_not_edge_triples() -> None:
+    graphs = create_test_graphs()
+    weighted = weighted_adjacency_from_graph(graphs["weighted_shortest_path"])
+    neighbors = weighted[0]
+    assert neighbors
+    assert all(len(item) == 2 for item in neighbors)
+    neighbor, weight = neighbors[0]
+    assert isinstance(neighbor, int)
+    assert isinstance(weight, float)
 
 
 def test_dijkstra_and_kruskal_match_numeric_ground_truth() -> None:

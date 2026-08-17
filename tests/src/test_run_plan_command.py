@@ -63,6 +63,34 @@ def test_checked_in_plans_load_as_planner_envelopes() -> None:
         assert paper.title
 
 
+def test_synthetic_graph_plan_documents_weighted_adj_shape() -> None:
+    from src.persistence import load_planner_envelope
+
+    path = Path("data/papers/synthetic_graph/synthetic_graph_plan.json")
+    envelope = load_planner_envelope(json.loads(path.read_text(encoding="utf-8")))
+    construct = next(phase for phase in envelope.payload.phases if phase.kind == "construct")
+    spec = construct.specification
+    example = spec["weighted_adj_example"]
+    assert example == {"0": [[1, 2.0], [7, 12.0]], "1": [[0, 2.0], [2, 2.0]]}
+    assert "not an edge list" in spec["weighted_adj_contract"].lower()
+    dijkstra = spec["algorithm_specs"]["dijkstra"]
+    assert "tuple" in dijkstra["output"].lower()
+    assert "predecessor" in dijkstra["constraints"].lower()
+    floyd = spec["algorithm_specs"]["floyd_warshall"]
+    assert "neighbor, weight" in floyd["constraints"]
+    assert "diagonal" in floyd["constraints"].lower()
+    dfs = spec["algorithm_specs"]["dfs"]
+    assert "traversal order" in dfs["output"].lower() or "visit order" in dfs["output"].lower()
+    assert "list(set" in dfs["constraints"]
+    kruskal = spec["algorithm_specs"]["kruskal"]
+    assert "float" in kruskal["output"].lower()
+    notes = " ".join(envelope.payload.engineer_notes).lower()
+    assert "weighted_adj" in notes
+    assert "predecessor" in notes
+    assert "diagonal" in notes
+    assert "visit order" in notes
+
+
 def test_run_saved_plan_missing_plan_returns_error(tmp_path: Path) -> None:
     code = run_saved_plan(
         plan_path=str(tmp_path / "missing.json"),

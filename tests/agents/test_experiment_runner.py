@@ -6,10 +6,28 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
-from src.agents.experiment_runner import ExperimentRunner
+from src.agents.experiment_runner import (
+    ExperimentRunner,
+    _format_command_streams,
+    _sanitize_step_id,
+)
 from src.agents.executor import ExecutorAgent
 from src.state import EngineerOutput, PatchProposal, RepoContext
 from src.tools.docker_executor import DockerExecutor
+
+
+def test_sanitize_step_id_keeps_logs_filesystem_safe() -> None:
+    assert _sanitize_step_id("graph_validation__floyd_warshall_weighted_shortest_path") == (
+        "graph_validation__floyd_warshall_weighted_shortest_path"
+    )
+    assert _sanitize_step_id("suite__bad") == "suite__bad"
+
+
+def test_format_command_streams_prefers_stderr() -> None:
+    text = _format_command_streams("Wrote results.json", "TypeError: cannot unpack")
+    assert text.startswith("STDERR:")
+    assert "TypeError: cannot unpack" in text
+    assert "Wrote results.json" in text
 
 
 class _FakeContainer:
@@ -39,10 +57,12 @@ class _FakeContainer:
 
 
 class _FakeDockerClient:
-    def __init__(self, status_code: int = 0):
+    def __init__(self, status_code: int = 0, stderr: str = "", results: list[tuple[int, str, str]] | None = None):
         self.images = SimpleNamespace(build=self._build)
         self.containers = SimpleNamespace(run=self._run)
         self.status_code = status_code
+        self.stderr = stderr
+        self.results = list(results or [])
         self.commands: list[str] = []
 
     def ping(self) -> bool:
@@ -55,7 +75,11 @@ class _FakeDockerClient:
         _ = image
         if command and len(command) >= 3:
             self.commands.append(command[2])
-        container = _FakeContainer(status_code=self.status_code)
+        if self.results:
+            status_code, stdout, stderr = self.results.pop(0)
+        else:
+            status_code, stdout, stderr = self.status_code, "ok", self.stderr
+        container = _FakeContainer(status_code=status_code, stdout=stdout, stderr=stderr)
         self.last_container = container
         return container
 
@@ -205,8 +229,9 @@ def test_experiment_runner_retries_then_fails(monkeypatch, tmp_path: Path) -> No
     assert "setup" in metrics_doc.phases_failed
     assert "smoke" in metrics_doc.phases_failed
     assert metrics_doc.attempts == 3
-    assert (run_dir / "engineer_attempt_1.log").exists()
-    assert (run_dir / "engineer_attempt_3.log").exists()
+    attempt_logs = sorted(run_dir.glob("engineer_attempt_*.log"))
+    assert any(path.name.startswith("engineer_attempt_1_") for path in attempt_logs)
+    assert any(path.name.startswith("engineer_attempt_3_") for path in attempt_logs)
     # setup retries 3 times; smoke is skipped via depends_on (no extra docker calls)
     assert len(fake_client.commands) == 3
 
@@ -502,7 +527,8 @@ def test_experiment_runner_continues_after_row_failure(monkeypatch, tmp_path: Pa
             cmd = command[2] if command and len(command) >= 3 else ""
             self.commands.append(cmd)
             status = 1 if "failme" in cmd else 0
-            container = _FakeContainer(status_code=status)
+            stderr = "ValueError: not enough values to unpack (expected 3, got 2)\n" if status else ""
+            container = _FakeContainer(status_code=status, stderr=stderr)
             self.last_container = container
             return container
 
@@ -578,9 +604,16 @@ def test_experiment_runner_continues_after_row_failure(monkeypatch, tmp_path: Pa
     assert any(m.metric_name == "regret" for m in metrics_doc.metrics)
     log_text = (run_dir / "engineer.log").read_text(encoding="utf-8")
     assert "continuing to next row" in log_text
+    assert "ValueError: not enough values to unpack" in log_text
+    fail_logs = list(run_dir.glob("engineer_attempt_*_suite__bad.log"))
+    ok_logs = list(run_dir.glob("engineer_attempt_*_suite__good.log"))
+    assert fail_logs
+    assert ok_logs
+    assert "ValueError: not enough values to unpack" in fail_logs[0].read_text(encoding="utf-8")
+    assert "ValueError: not enough values to unpack" not in ok_logs[0].read_text(encoding="utf-8")
 
 
-def test_experiment_runner_stops_on_fatal_import_error(monkeypatch, tmp_path: Path) -> None:
+def test_experiment_runner_continues_matrix_on_fatal_error(monkeypatch, tmp_path: Path) -> None:
     class _FatalClient(_FakeDockerClient):
         def _run(self, image, command=None, **_kwargs):
             _ = image
@@ -648,12 +681,17 @@ def test_experiment_runner_stops_on_fatal_import_error(monkeypatch, tmp_path: Pa
     )
     metrics_doc, run_dir = runner.execute_paper(paper_id=paper_id)
 
-    assert len(fake_client.commands) == 1
+    assert len(fake_client.commands) == 2
     assert metrics_doc.attempts == 1
     assert metrics_doc.run_status == "FAILED"
+    assert len(metrics_doc.experiment_matrix) == 2
+    assert metrics_doc.experiment_matrix[0].status == "failed"
+    assert metrics_doc.experiment_matrix[1].status == "failed"
     log_text = (run_dir / "engineer.log").read_text(encoding="utf-8")
     assert "not retrying" in log_text
-    assert "skipping remaining rows" in log_text
+    assert "continuing to next row" in log_text
+    assert "AttributeError: module 'skopt' has no attribute 'gpr'" in log_text
+    assert any("AttributeError" in error for error in metrics_doc.errors)
 
 
 def test_experiment_runner_skips_on_low_memory(monkeypatch, tmp_path: Path) -> None:

@@ -8,16 +8,13 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from graph_algorithms import (
+from graph_algorithms import bfs, dfs, dijkstra, floyd_warshall, kruskal_mst_weight
+from graph_utils import (
     adjacency_from_graph,
-    bfs,
-    dfs,
-    dijkstra,
-    floyd_warshall,
-    kruskal_mst_weight,
+    default_graphs_path,
+    load_graphs,
     weighted_adjacency_from_graph,
 )
-from setup_graph import default_graphs_path, load_graphs
 
 logger = logging.getLogger(__name__)
 BENCHMARK_DIR = Path(__file__).resolve().parent

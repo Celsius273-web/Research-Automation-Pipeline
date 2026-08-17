@@ -33,7 +33,14 @@
     },
     "weighted": true,
     "ground_truth": {
-      "dijkstra_distances_from_0": {"0": 0.0, "1": 2.0, "2": 4.0, "3": 6.0, "4": 8.0, "5": 10.0, "6": 12.0, "7": 12.0, "8": 14.0, "9": 16.0}
+      "dijkstra_distances_from_0": {"0": 0.0, "1": 2.0, "2": 4.0, "3": 6.0, "4": 8.0, "5": 10.0, "6": 12.0, "7": 12.0, "8": 14.0, "9": 16.0},
+      "floyd_warshall_sample": {
+        "diagonal_must_be_zero": 0.0,
+        "path_0_to_0": 0.0,
+        "path_0_to_9": 16.0,
+        "path_1_to_1": 0.0,
+        "all_shortest_paths_match_dijkstra": true
+      }
     }
   },
   "minimum_spanning_tree": {
@@ -54,6 +61,22 @@
     "ground_truth": {
       "mst_weight": 17.0,
       "mst_edges": [[1, 2, 1.0], [5, 6, 1.0], [3, 4, 2.0], [6, 7, 2.0], [0, 2, 3.0], [4, 5, 3.0], [0, 1, 4.0], [1, 3, 5.0]]
+    }
+  },
+  "linear_chain": {
+    "description": "Linear undirected chain 0-1-2-3 (DFS/BFS order is deterministic)",
+    "nodes": [0, 1, 2, 3],
+    "edges": [[0, 1], [1, 2], [2, 3]],
+    "adjacency_list": {
+      "0": [1],
+      "1": [0, 2],
+      "2": [1, 3],
+      "3": [2]
+    },
+    "weighted": false,
+    "ground_truth": {
+      "dfs_order_from_0": [0, 1, 2, 3],
+      "bfs_order_from_0": [0, 1, 2, 3]
     }
   },
   "dag": {

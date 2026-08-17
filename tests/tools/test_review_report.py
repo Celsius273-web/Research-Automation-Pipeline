@@ -94,6 +94,32 @@ def test_assign_confidence_high_requires_full_success() -> None:
     assert assign_confidence("FAILED", reported_count=1, captured_count=1, matched_rows=matched) == "LOW"
 
 
+def test_resolve_captured_requires_algorithm_when_reported_has_algorithm() -> None:
+    reported = [
+        ReportedResult(
+            benchmark="weighted_shortest_path",
+            algorithm="floyd_warshall",
+            metric_name="output",
+            value="{}",
+        )
+    ]
+    metrics_doc = MetricsDocument(
+        run_status="PARTIAL",
+        metrics=[
+            CapturedMetric(
+                benchmark="weighted_shortest_path",
+                algorithm="dijkstra",
+                metric_name="output",
+                value="[0]",
+                source="run_graph.py",
+            )
+        ],
+    )
+    report = build_reviewer_run_report("synthetic_graph", reported, metrics_doc)
+    assert report.metrics_matched == []
+    assert report.metrics_missing[0].reason == "missing_captured"
+
+
 def test_reviewer_aliases_table1_fx_to_best_objective() -> None:
     reported = [
         ReportedResult(

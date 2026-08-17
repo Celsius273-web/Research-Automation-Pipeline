@@ -100,6 +100,50 @@ def _sequence_as_set(items: list[Any]) -> set[Any] | None:
         return None
 
 
+def _reconstruct_dfs_order(
+    adj: dict[int, list[int]] | None,
+    start: int = 0,
+) -> list[int]:
+    """Reconstruct DFS order from adjacency list."""
+    if not adj or start not in adj:
+        return []
+    order: list[int] = []
+    seen: set[int] = set()
+
+    def visit(node: int) -> None:
+        seen.add(node)
+        order.append(node)
+        for neighbor in adj.get(node, []):
+            if neighbor not in seen:
+                visit(neighbor)
+
+    visit(start)
+    return order
+
+
+def _is_valid_bfs_order(
+    order: list[Any],
+    adj: dict[int, list[int]] | None,
+    start: int = 0,
+) -> bool:
+    """Check if order is a valid BFS traversal from start on adjacency list adj."""
+    if not adj or not order or order[0] != start:
+        return False
+    from collections import deque
+
+    visited = set([start])
+    queue = deque([start])
+    bfs_order = [start]
+    while queue:
+        node = queue.popleft()
+        for neighbor in adj.get(node, []):
+            if neighbor not in visited:
+                visited.add(neighbor)
+                queue.append(neighbor)
+                bfs_order.append(neighbor)
+    return list(order) == bfs_order
+
+
 def _match_status_from_delta(delta_pct: float) -> str:
     abs_delta = abs(delta_pct)
     if abs_delta <= REVIEW_MATCH_TOLERANCE_PCT:

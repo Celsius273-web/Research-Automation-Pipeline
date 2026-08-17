@@ -58,7 +58,7 @@ data/papers/{paper_id}/runs/R{N}/
 ## What the Executor runs
 
 - **optimize**: `python run_all.py` (5 functions × 2 optimizers × 3 seeds). Aggregated `CapturedMetric` rows go to `results/synthetic_optimize/metrics.json`.
-- **graph**: one `python run_graph.py ...` command per algorithm. Per-algorithm JSON goes to `results/synthetic_graph/{algorithm}.json`.
+- **graph**: Engineer writes `graph_algorithms.py` (5 functions). Harness provides `graph_utils.py` and `run_graph.py`.
 
 Paper markdown (do not edit here; improved separately):
 

@@ -97,8 +97,10 @@ def _resolve_captured(
     by_pair: dict[tuple[str, str], list[CapturedMetric]],
 ) -> CapturedMetric | None:
     triple = _pair_key(reported.benchmark, reported.algorithm, reported.metric_name)
-    if reported.algorithm.strip() and triple in by_triple:
-        return _pick_captured(by_triple[triple], reported.algorithm)
+    if reported.algorithm.strip():
+        if triple in by_triple:
+            return _pick_captured(by_triple[triple], reported.algorithm)
+        return None
     pair = (
         canonicalize_benchmark(reported.benchmark),
         canonicalize_metric(reported.metric_name),
