@@ -1,0 +1,24 @@
+{
+  "run_status": "FAILED",
+  "exit_code": 1,
+  "attempts": 3,
+  "timestamp": "2026-08-14T22:34:23Z",
+  "metrics": [],
+  "experiment_matrix": [],
+  "logs_captured": true,
+  "phases_completed": [],
+  "phases_failed": [
+    "algorithms",
+    "engineer_code",
+    "graphs",
+    "setup"
+  ],
+  "errors": [
+    "setup__setup attempt 1 failed (exit_code=1)",
+    "setup__setup attempt 2 failed (exit_code=1)",
+    "setup__setup attempt 3 failed (exit_code=1)",
+    "Skipping phase 'engineer_code' because depends_on failed: ['setup']",
+    "Skipping phase 'graphs' because depends_on failed: ['engineer_code']",
+    "Skipping phase 'algorithms' because depends_on failed: ['graphs']"
+  ]
+}

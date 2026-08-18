@@ -1,0 +1,84 @@
+{
+  "paper": {
+    "paper_id": "test_paper",
+    "title": "A Test Paper on Bayesian Optimization",
+    "pdf_path": "/tmp/test.pdf",
+    "arxiv_id": null
+  },
+  "review": {
+    "status": "approved",
+    "notes": "looks good"
+  },
+  "by_section": {
+    "abstract": {
+      "research_question": "How does X affect Y?",
+      "paper_overview": "",
+      "methodology": "GP surrogate with EI",
+      "datasets_or_benchmarks": [
+        "BBOB"
+      ],
+      "variables": [
+        "lengthscale"
+      ],
+      "hyperparameters": {},
+      "evaluation_metrics": [
+        "simple regret"
+      ],
+      "reported_results": [
+        {
+          "benchmark": "BBOB",
+          "algorithm": "",
+          "metric_name": "simple regret",
+          "value": "0.12",
+          "source": "abstract"
+        }
+      ],
+      "notes": "Abstract only."
+    },
+    "method": {
+      "research_question": "",
+      "paper_overview": "",
+      "methodology": "Matern52 kernel with ARD",
+      "datasets_or_benchmarks": [],
+      "variables": [],
+      "hyperparameters": {
+        "learning_rate": "1e-3",
+        "batch_size": "32"
+      },
+      "evaluation_metrics": [
+        "NLL"
+      ],
+      "reported_results": [],
+      "notes": ""
+    }
+  },
+  "merged": {
+    "research_question": "How does X affect Y?",
+    "paper_overview": "",
+    "methodology": "GP surrogate with EI",
+    "datasets_or_benchmarks": [
+      "BBOB"
+    ],
+    "variables": [
+      "lengthscale"
+    ],
+    "hyperparameters": {
+      "learning_rate": "1e-3",
+      "batch_size": "32"
+    },
+    "evaluation_metrics": [
+      "simple regret",
+      "NLL"
+    ],
+    "reported_results": [
+      {
+        "benchmark": "BBOB",
+        "algorithm": "",
+        "metric_name": "simple regret",
+        "value": "0.12",
+        "source": "abstract"
+      }
+    ],
+    "notes": "Abstract only."
+  }
+}

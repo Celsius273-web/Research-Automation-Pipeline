@@ -1,0 +1,1341 @@
+# Planner debug: hbo_baseline
+
+- created_at: `2026-08-11T19:01:01.195408+00:00`
+- model: `qwen3.5:9b`
+- attempts: 2
+- final_error: none
+
+## Input the planner received
+
+### analyst_output summary
+- research_question empty/unknown: False
+- methodology chars: 482
+- datasets_or_benchmarks count: 10
+- variables count: 30
+- hyperparameters count: 20
+- evaluation_metrics count: 20
+- reported_results count: 10
+- notes chars: 3138
+- keys: ['datasets_or_benchmarks', 'evaluation_metrics', 'hyperparameters', 'methodology', 'notes', 'paper_overview', 'reported_results', 'research_question', 'variables']
+
+### analyst_output (full)
+```json
+{
+  "research_question": "How does Hyperband improve hyperparameter optimization efficiency compared to Bayesian methods?",
+  "paper_overview": "The paper introduces **Hyperband**, a novel approach for hyperparameter optimization that frames the problem as an adaptive resource allocation task. Unlike traditional Bayesian Optimization (BO) which assumes smoothness or low effective dimensions, Hyperband uses early stopping on partially trained models to efficiently discard poor configurations while investing more resources in promising ones.",
+  "methodology": "1. **Adaptive Resource Allocation**: Instead of training all configurations fully, Hyperband allocates computational budget (e.g., epochs) dynamically.\n2. **Early Stopping Strategy**: Poor-performing runs are terminated early based on validation loss trends.\n3. **Pure-Exploration Bandit Formulation**: The problem is modeled as an infinite-armed bandit where the goal is to identify good configurations without relying on strong structural assumptions about the objective function.",
+  "datasets_or_benchmarks": [
+    "HPOlib benchmark library",
+    "117 multistage model selection tasks (including deep learning and kernel-based problems)",
+    "MNIST dataset",
+    "Stochastic Infinite-armed Bandit Setting",
+    "General Parametric Assumptions (Equations 5 and 6)",
+    "CIFAR-10",
+    "MRBI",
+    "SVHN",
+    "OpenML (117 binary/multiclass classification datasets)",
+    "MNIST"
+  ],
+  "variables": [
+    "R: Maximum resource per configuration (e.g., iterations/epochs)",
+    "\u03b7: Factor controlling proportion of configurations discarded each round (default=3)",
+    "n: Number of configurations",
+    "r: Resources allocated to initial batch in a bracket",
+    "s: Bracket index determining trade-off between n and r",
+    "$\\ell_{i,k}$: Loss at step $k$ for arm $i$",
+    "$\\nu_i$: Limit loss of arm $i$ as $k \\to \\infty$",
+    "$F$: Cumulative distribution function (CDF) of the limit losses",
+    "$\\gamma(j)$: Bound on deviation from limit value after $j$ steps",
+    "$R$: Horizon where convergence is guaranteed ($\\gamma(R)=0$)",
+    "SuccessiveHalving (SH): Subroutine used by Hyperband to prune arms",
+    "n: Number of arms/configurations tested simultaneously",
+    "B: Total budget/number of measurements",
+    "\\delta: Error probability threshold",
+    "\u03b1, \\beta: Parameters defining the distribution F (accuracy gap decay)",
+    "T: Total exhausted budget",
+    "Algorithm type (Hyperband finite/infinite, SMAC, TPE, random search)",
+    "Resource budget (measured in multiples of R or iterations)",
+    "Dataset size and complexity",
+    "Model architecture constraints",
+    "Hyperparameters (e.g., C, gamma, degree)",
+    "Preprocessing methods (min/max, standardize, normalize)",
+    "Kernel types (rbf, polynomial, sigmoid)",
+    "\\nu^* (target value)",
+    "b_\\nu (estimated lower bound for \\nu^*)",
+    "\\gamma, B/n (scaling parameters related to interval widths)",
+    "F^{-1} (inverse CDF of the underlying distribution)",
+    "n, k, l (sample sizes or iteration indices)",
+    "\\delta, c (confidence and absolute constants)",
+    "\\alpha, \\beta (exponents governing the tail behavior of F)"
+  ],
+  "hyperparameters": {
+    "r": "description_of_parameter_and_its_role_in_the_methodology",
+    "\u03b7": "description_of_parameter_and_its_role_in_the_methodology",
+    "budget_b": "Total computational budget allocated per configuration",
+    "n_arms": "Number of hyperparameter configurations sampled simultaneously in Successive Halving",
+    "r_k": "Resources (e.g., iterations) allocated to each arm at round $k$ in SH",
+    "k_stage_factor": "logarithmic scaling factor for stages in Hyperband",
+    "s_parallelism_factor": "Scaling factor determining parallel arms per stage",
+    "\u03b4_k_s_error_budget": "\\delta / (2^(k^3))",
+    "eta": "value controlling the growth rate between brackets; set to 3 for OpenML experiments, 4 for CIFAR-10 infinite horizon test.",
+    "nmax": "maximum number of configurations per bracket; limited to max{9, R/1000} in OpenML study",
+    "b": "starting budget for infinite horizon variant",
+    "c": "log[10^-3, 10^5]",
+    "gamma": "log[10^-5, 10]",
+    "degree": "[2, 5] (if kernel=poly)",
+    "coef0": "uniform[-1.0, 1.0] (if kernel=poly or sigmoid)",
+    "alpha_beta_relation": "The analysis distinguishes between cases where $\\alpha = \\beta$ and $\\alpha \\neq \\beta$, affecting the final bound's form.",
+    "confidence_delta": "\\delta controls the failure probability, appearing in logarithmic terms like $\\log(1/\\delta)$.",
+    "learning_rate": "adaptive based on performance trends",
+    "batch_size": "optimized via bandit allocation",
+    "epochs_per_config": "dynamically determined by Hyperband's pruning strategy"
+  },
+  "evaluation_metrics": [
+    "Test accuracy / validation loss reduction speed",
+    "Validation loss (intermediate losses)",
+    "Test error rate across multiple trials",
+    "$\\hat{\\nu}$: Estimated best limit loss found with total budget $B$",
+    "Regret/Gap: Difference between the optimal possible solution and the achieved solution",
+    "Sample Complexity: Total number of resource pulls required to find a near-optimal configuration",
+    "Convergence rate of the best arm's mean estimate to true optimum ($\\nu_{\u016fT} - \\nu_*$)",
+    "Total number of samples taken",
+    "Probability of selecting an arm within the top q-fraction",
+    "Average test error (primary metric)",
+    "Speedup factor relative to random search or other methods within a fixed resource window",
+    "Consistency across trials (low variance)",
+    "Average test error",
+    "Computation time",
+    "Probability of success ($\\ge 1-\\delta$)",
+    "Error bounds: $|\\hat{\\nu}_i - \\nu^*|$",
+    "Sample complexity (number of measurements)",
+    "validation accuracy",
+    "training time efficiency (FLOPs or wall-clock time)",
+    "regret bounds compared to random search and Bayesian optimization"
+  ],
+  "reported_results": [
+    {
+      "benchmark": "HPOlib & Deep Learning Tasks",
+      "algorithm": "",
+      "metric_name": "Speedup over Bayesian Optimization (SMAC, TPE)",
+      "value": "5x to 30x faster",
+      "source": "Section 1 Abstract"
+    },
+    {
+      "benchmark": "Non-stochastic Infinite-Horizon Setting (Theoretical Analysis)",
+      "algorithm": "Successive Halving (SH)",
+      "metric_name": "$z_{SH}$",
+      "value": "$2^{\\lceil \\log_2(n) \\rceil} \\max_{i=2,...,n} i(1 + \\gamma^{-1}(\\max\\{\\frac{\\epsilon}{4}, \\frac{\\nu_i-\\nu_1}{2}\\}))$",
+      "source": "Theorem 1 in the paper"
+    },
+    {
+      "benchmark": "Stochastic Infinite-armed Bandits",
+      "algorithm": "",
+      "metric_name": "\u03bd\u016fT - \u03bd*",
+      "value": "\\leq c \\left(\\frac{\\log(T)^3 \\log(\\log(T)/\\delta)}{T}\\right)^{1/\\max\\{\\alpha,\\beta\\}}",
+      "source": "Theorem 5"
+    },
+    {
+      "benchmark": "Uniform Allocation in Hyperband",
+      "algorithm": "",
+      "metric_name": "\u03bd\u016fT - \u03bd*",
+      "value": "\\leq c \\left(\\frac{\\log(T)\\log(\\log(T)/\\delta)}{T}\\right)^{1/(\\alpha+\\beta)}",
+      "source": "Theorem 5 (modified proof)"
+    },
+    {
+      "benchmark": "MRBI",
+      "algorithm": "",
+      "metric_name": "Average Test Error vs. Resource Budget",
+      "value": "Hyperband is over an order-of-magnitude faster than standard configuration selection approaches and 5\u00d7 faster than SMAC (early). See Figure 4(b).",
+      "source": "Figure 4(b) and text"
+    },
+    {
+      "benchmark": "SVHN",
+      "algorithm": "",
+      "metric_name": "Average Test Error vs. Resource Budget",
+      "value": "While Hyperband finds good configurations faster, Bayesian methods are competitive here; SMAC (early) even outperforms Hyperband in some cases. See Figure 4(c).",
+      "source": "Figure 4(c) and text"
+    },
+    {
+      "benchmark": "OpenML (117 datasets)",
+      "algorithm": "",
+      "metric_name": "Speedup due to subsampling on specific subsets",
+      "value": "On a subset of 21 datasets, Hyperband achieved at least a 3\u00d7 speedup via 8\u00d7 downsampling. Full results across all 117 are referenced in Figure 5(a,b) (not fully reproduced here).",
+      "source": "Section 4.2.1"
+    },
+    {
+      "benchmark": "Hyperband Brackets",
+      "algorithm": "",
+      "metric_name": "n_i values for s=4,3,2,1,0",
+      "value": "[81, 27, 9, 6, 5]",
+      "source": "Table 1"
+    },
+    {
+      "benchmark": "Kernel Regularized Least Squares",
+      "algorithm": "",
+      "metric_name": "Hyperparameter Space",
+      "value": "Learning Rate: log[1e-3, 1e-1], Batch size: log[1e1, 1e3], k2: linear[10,60], k1: linear[5,k2]",
+      "source": "Table 4"
+    },
+    {
+      "benchmark": "Random Feature Kernel Approximation",
+      "algorithm": "",
+      "metric_name": "Hyperparameter Space",
+      "value": "preprocessor: [none, min/max, standardize, normalize], lambda: log[1e-3, 1e5], gamma: log[1e-5, 10]",
+      "source": "Table 5"
+    }
+  ],
+  "notes": {
+    "what_to_know": [
+      "Hyperband is theoretically grounded in the **infinite-armed bandit** setting.",
+      "It avoids assumptions about convergence rates that often fail empirically (unlike parametric methods).",
+      "The method scales well because it does not require fitting complex posterior distributions like Gaussian Processes.",
+      "Adaptive Allocation**: Exploits situations where adaptive allocation works well while protecting against cases requiring conservative approaches.",
+      "The paper distinguishes between the 'finite horizon' setting ($R < \\infty$, known convergence point) and the 'infinite horizon' setting ($R = \\infty$). Hyperband is analyzed primarily in the infinite-horizon case for theoretical tractability, though finite horizons are more common in practice.",
+      "Hyperband dynamically allocates resources by running multiple instances of Successive Halving with different budgets ($B_{k,s} = 2^k, n_{k,s} = 2^s$) and combining their results.",
+      "Hyperband addresses the issue of not knowing the optimal $n$ or $B$.",
+      "By trying different values in a specific order and doubling the budget, it ensures that the loss from identifying the 'best' setting is no more than $\\log(B)$ times necessary."
+    ],
+    "implementation_details": [
+      "The function $\\gamma(j)$ represents how quickly a model's validation loss converges. If training on full data takes time $T$, then $\\gamma(k)=0$ for all $k \\ge T$.",
+      "On CIFAR-10, state-of-the-art results using more data (including validation set) achieve ~17.0% error vs. our 15.0\u201318% range depending on setup; this gap is attributed to larger training sets and extended epochs in prior work.",
+      "The paper highlights shortcomings in the experimental setup, such as random search testing varying numbers of configurations depending on dataset size.",
+      "Some classifiers/preprocessing methods cause memory errors (quadratic storage requirements), which can waste time if a searcher trains on a subsample but fails on the full dataset.",
+      "The result highlights a dependency on the maximum of exponents $\\beta$ and $\\alpha$, modulated by logarithmic factors.",
+      "Extracted tables from Appendix pages. Table 1 shows Hyperband bracket parameters (n_i, r_i). Tables 4 and 5 define hyperparameter search spaces for specific classification problems."
+    ],
+    "issues": [],
+    "warnings": [
+      "Consistency Guarantees**: Assumes uniform sampling from hyperparameter space; better priors improve performance.",
+      "Cost Trade-off**: Requires approximately (smax + 1) times more work than single-value SuccessiveHalving but removes need for manual n selection.",
+      "The paper shows that SuccessiveHalving generally requires less average resource per arm compared to uniform allocation for distinguishing top arms.",
+      "Infinite horizon Hyperband underperforms finite version within fixed budgets because it must tune max resource R and starts with less aggressive early stopping.",
+      "Hyperband assumes computation scales linearly with data set size; for very small datasets, initialization overheads dominate.",
+      "Hyperband is particularly effective when the evaluation of a hyperparameter configuration requires multiple epochs."
+    ]
+  }
+}
+```
+
+### repo_context
+```json
+{
+  "url": "https://github.com/automl/HpBandSter.git",
+  "language": "python",
+  "build_system": "python -m venv --clear .venv && .venv/bin/pip install -U pip && .venv/bin/pip install . matplotlib pandas scipy scikit-learn",
+  "has_code": true,
+  "setup_time_minutes": 5.0,
+  "file_tree": "CONTRIBUTING.md, LICENSE, README.md, build/, codecov.yml, docs/, hpbandster.egg-info/, hpbandster/, setup.py, tests/",
+  "readme_summary": "HpBandSter ](https://travis-ci.org/automl/HpBandSter) ](https://codecov.io/gh/automl/HpBandSter) a distributed Hyperband implementation on Steroids News: Not Maintained Anymore! Please note that we don't maintain this repository anymore. We also cannot ensure that we can reply to issues in the issue tracker or look into PRs.",
+  "example_commands": [
+    "python3 setup.py develop --user"
+  ],
+  "entrypoint_hints": [
+    "setup.py",
+    "build/lib/hpbandster/examples/example_1_local_sequential.py",
+    "build/lib/hpbandster/examples/example_2_local_parallel_threads.py",
+    "build/lib/hpbandster/examples/example_3_local_parallel_processes.py",
+    "build/lib/hpbandster/examples/example_4_cluster.py",
+    "build/lib/hpbandster/examples/example_5_keras_worker.py",
+    "build/lib/hpbandster/examples/example_5_mnist.py",
+    "build/lib/hpbandster/examples/example_5_pytorch_worker.py",
+    "build/lib/hpbandster/examples/example_8_mnist_continued.py",
+    "build/lib/hpbandster/examples/plot_example_6_analysis.py"
+  ],
+  "dependency_files": [
+    "setup.py"
+  ],
+  "has_runnable_experiment_command": true,
+  "execution_surface": "script",
+  "has_library_verification": true,
+  "has_script_entrypoints": true,
+  "has_native_build": false,
+  "has_config_files": false,
+  "has_container_files": false,
+  "has_artifact_dirs": false,
+  "repo_path": "/Users/school/ResearchAssistant/data/papers/hbo_baseline/code"
+}
+```
+
+- example_commands count: 1
+### paper_context
+```json
+{
+  "paper_id": "hbo_baseline",
+  "title": "hbo_baseline",
+  "pdf_path": "/Users/school/ResearchAssistant/data/papers/hbo_baseline/paper.pdf",
+  "arxiv_id": null
+}
+```
+
+### flags
+```json
+{
+  "has_research_question": true,
+  "has_methodology": true,
+  "has_code_repo": true,
+  "has_datasets": true,
+  "paper_type": "methods"
+}
+```
+
+## System prompt
+- char_count: 5740
+```text
+You are one agent in a fixed multi-stage pipeline. Your output is consumed programmatically by the next
+agent without manual cleanup. Keep the output machine-parseable and deterministic.
+
+Pipeline reality and constraints:
+- All experiment execution runs CPU-only inside Docker.
+- Downstream agents rely on exact JSON field names and value types.
+- Never fabricate any number, citation, or file path that is not explicitly present in the provided input.
+- If an input fact is missing, mark it unknown with a short reason instead of inventing it.
+
+Role: Planner
+You convert one validated unified input into an Engineer-ready phase DAG plan.
+
+Input fields:
+- analyst_output: research_question, paper_overview, methodology, datasets_or_benchmarks,
+  variables, hyperparameters, evaluation_metrics, reported_results, and categorized notes.
+- repo_context: build_system, example_commands, entrypoint_hints, dependency_files 
+  (list of setup.py/requirements.txt paths), has_runnable_experiment_command,
+  execution_surface (cli|script|library|native|config|container|artifact|unknown),
+  surface flags (has_script_entrypoints, has_native_build, has_library_verification, ...).
+- repo_exploration: README, file tree, registry_ids, script_entrypoints, script_tunables,
+  native_build/native_tests, config_files, container_files, test_files, notebooks,
+  verification_commands, source_excerpts. Prefer payload.phase_scaffold when present.
+- paper_context, flags, results_contract.
+
+Operating procedure:
+1. Treat analyst_output as paper ground truth. Do not re-extract the PDF.
+2. Dive repo_exploration (README → tree → surface evidence → excerpts) before planning.
+If repo has subdirectories with requirements.txt, use: cd <subdir> && pip install -r requirements.txt 
+(or enumerate all deps inline) to install the dependencies.
+Never use pip install -r requirements.txt at root without verifying it exists.
+3. Prefer phase_scaffold; keep scaffold axes/matrix/goals for experiment phases.
+   Enrich objective, plan_summary, setup/summarize notes, organization, execution,
+   repo_usage. Do not invent numeric values that contradict scaffold axes.
+   Output a phases DAG:
+   - cli: setup → smoke → synthetic/real_world/ablations → summarize
+   - script: setup → smoke → experiments (scripts or scraped tunables) → summarize
+   - library: setup → library_smoke → reproduce_similar → summarize
+   - native: setup → deps_check → native_smoke → generate_inputs → reproduce_similar → summarize
+   - config/container/artifact: use matching scaffold; note gaps in missing_context
+   - unknown: setup + missing_context (never silently empty phases)
+   - each phase has depends_on, variables, axes, run_template, matrix (few example rows),
+     planned_actions, code_refs/verify on each matrix row.
+4. Matrix row fields: name, variables (factor→value), run_command, code_refs, verify, results_path.
+   Do not use implementation_steps or execution_pattern.
+5. variables on a phase = only factors that vary in that phase
+   (benchmark/algorithm/seed, script, test_module, config, etc.).
+6. Hyperparameter / ablation values: only from analyst_output.hyperparameters, registries,
+   or scraped script tunables. Never invent CLIs. For non-CLI surfaces use tests/scripts/
+   build files; mark data/container gaps in missing_context.
+7. Prefer status ok/partial. Block only when both research_question and methodology are absent.
+8. results_summary_path must equal results_contract.summary_path.
+9. Do not put ``python -m venv`` or ``.venv/bin/`` in setup/run commands. Use bare
+   ``pip install …`` and ``python …``. Engineer creates a workspace-mounted venv at runtime.
+10. Dependency Extraction from Repo:
+   a) Scan setup.py install_requires, requires, and extras_require for ALL package versions.
+   b) If pyproject.toml exists: extract dependencies from [project] dependencies + optional-dependencies.
+   c) If requirements.txt exists: include every line (skip comments).
+   d) Compare analyst_output.hyperparameters and methodology against repo dependencies.
+      If paper uses "PyTorch" but setup.py requires torch>=1.10, include torch in pip install.
+   e) Build the setup command as:
+      $ pip install . [repo-extracted-deps] [analyst-mentioned-deps not in repo]
+      Example: pip install . torch torchvision torchaudio transformers numpy scipy matplotlib
+   f) Never use bare pip install . without augmentation; always surface missing packages.
+   g) If repo has extras (e.g., install_requires + optional-dependencies for dev/gpu), include
+      only the core + required extras for the experiments phase, not all extras.
+11. Engineer runs ``matrix`` rows only by default (not the full ``axes`` cartesian product).
+    Put every run you want executed into ``matrix`` with concrete ``run_command`` /
+    ``results_path``. Use ``axes`` to document the broader paper suite / intent.
+    Keep matrices small unless a full paper reproduction is explicitly required.
+12. Deterministic verification (post-scaffold) keeps only grounded runnable matrix rows
+   (entrypoint exists, flags documented). Manual OrderedDict edits, unit-test-as-
+   reproduction, and undocumented flags are repaired via Planner stubs under
+   planner_stubs/ when possible, otherwise those phases are collapsed (blocked) and
+   moved to missing_context — never leave empty experiment matrices in the DAG.
+
+Hard rules:
+- Return exactly one raw JSON object. No prose or markdown fences.
+- Top-level: schema_version, agent, status, unknowns, warnings, payload.
+- schema_version "2.0"; agent "planner"; status ok|partial|blocked.
+- Populate payload.phases; never invent entrypoints; never leave phases empty when has_code.
+
+Domain vocabulary:
+Use only terminology present in analyst_output.
+```
+
+## LLM attempts
+
+### Attempt 1
+- reminder: `none`
+- outcome: `error`
+- error: `Unterminated string starting at: line 1 column 8207 (char 8206)`
+- user_prompt chars: 43522
+
+#### User prompt (what the model saw this call)
+```text
+Create an Engineer-ready phase-DAG plan from this unified Planner input.
+        Use analyst_output as paper ground truth.
+        Prefer phase_scaffold for axes/matrix/goals on experiment phases; enrich
+        objective, plan_summary, setup/summarize notes, organization, execution,
+        and repo_usage. Do not expand full cartesian products.
+        Honor repo_context, flags, and the code-owned results_contract.
+
+        Context JSON:
+        {"analyst_output":{"research_question":"How does Hyperband improve hyperparameter optimization efficiency compared to Bayesian methods?","paper_overview":"The paper introduces **Hyperband**, a novel approach for hyperparameter optimization that frames the problem as an adaptive resource allocation task. Unlike traditional Bayesian Optimization (BO) which assumes smoothness or low effective dimensions, Hyperband uses early stopping on partially trained models to efficiently discard poor configurations while investing more resources in promising ones.","methodology":"1. **Adaptive Resource Allocation**: Instead of training all configurations fully, Hyperband allocates computational budget (e.g., epochs) dynamically.\n2. **Early Stopping Strategy**: Poor-performing runs are terminated early based on validation loss trends.\n3. **Pure-Exploration Bandit Formulation**: The problem is modeled as an infinite-armed bandit where the goal is to identify good configurations without relying on strong structural assumptions about the objective function.","datasets_or_benchmarks":["HPOlib benchmark library","117 multistage model selection tasks (including deep learning and kernel-based problems)","MNIST dataset","Stochastic Infinite-armed Bandit Setting","General Parametric Assumptions (Equations 5 and 6)","CIFAR-10","MRBI","SVHN","OpenML (117 binary/multiclass classification datasets)","MNIST"],"variables":["R: Maximum resource per configuration (e.g., iterations/epochs)","η: Factor controlling proportion of configurations discarded each round (default=3)","n: Number of configurations","r: Resources allocated to initial batch in a bracket","s: Bracket index determining trade-off between n and r","$\\ell_{i,k}$: Loss at step $k$ for arm $i$","$\\nu_i$: Limit loss of arm $i$ as $k \\to \\infty$","$F$: Cumulative distribution function (CDF) of the limit losses","$\\gamma(j)$: Bound on deviation from limit value after $j$ steps","$R$: Horizon where convergence is guaranteed ($\\gamma(R)=0$)","SuccessiveHalving (SH): Subroutine used by Hyperband to prune arms","n: Number of arms/configurations tested simultaneously","B: Total budget/number of measurements","\\delta: Error probability threshold","α, \\beta: Parameters defining the distribution F (accuracy gap decay)","T: Total exhausted budget","Algorithm type (Hyperband finite/infinite, SMAC, TPE, random search)","Resource budget (measured in multiples of R or iterations)","Dataset size and complexity","Model architecture constraints","Hyperparameters (e.g., C, gamma, degree)","Preprocessing methods (min/max, standardize, normalize)","Kernel types (rbf, polynomial, sigmoid)","\\nu^* (target value)","b_\\nu (estimated lower bound for \\nu^*)","\\gamma, B/n (scaling parameters related to interval widths)","F^{-1} (inverse CDF of the underlying distribution)","n, k, l (sample sizes or iteration indices)","\\delta, c (confidence and absolute constants)","\\alpha, \\beta (exponents governing the tail behavior of F)"],"hyperparameters":{"r":"description_of_parameter_and_its_role_in_the_methodology","η":"description_of_parameter_and_its_role_in_the_methodology","budget_b":"Total computational budget allocated per configuration","n_arms":"Number of hyperparameter configurations sampled simultaneously in Successive Halving","r_k":"Resources (e.g., iterations) allocated to each arm at round $k$ in SH","k_stage_factor":"logarithmic scaling factor for stages in Hyperband","s_parallelism_factor":"Scaling factor determining parallel arms per stage","δ_k_s_error_budget":"\\delta / (2^(k^3))","eta":"value controlling the growth rate between brackets; set to 3 for OpenML experiments, 4 for CIFAR-10 infinite horizon test.","nmax":"maximum number of configurations per bracket; limited to max{9, R/1000} in OpenML study","b":"starting budget for infinite horizon variant","c":"log[10^-3, 10^5]","gamma":"log[10^-5, 10]","degree":"[2, 5] (if kernel=poly)","coef0":"uniform[-1.0, 1.0] (if kernel=poly or sigmoid)","alpha_beta_relation":"The analysis distinguishes between cases where $\\alpha = \\beta$ and $\\alpha \\neq \\beta$, affecting the final bound's form.","confidence_delta":"\\delta controls the failure probability, appearing in logarithmic terms like $\\log(1/\\delta)$.","learning_rate":"adaptive based on performance trends","batch_size":"optimized via bandit allocation","epochs_per_config":"dynamically determined by Hyperband's pruning strategy"},"evaluation_metrics":["Test accuracy / validation loss reduction speed","Validation loss (intermediate losses)","Test error rate across multiple trials","$\\hat{\\nu}$: Estimated best limit loss found with total budget $B$","Regret/Gap: Difference between the optimal possible solution and the achieved solution","Sample Complexity: Total number of resource pulls required to find a near-optimal configuration","Convergence rate of the best arm's mean estimate to true optimum ($\\nu_{ůT} - \\nu_*$)","Total number of samples taken","Probability of selecting an arm within the top q-fraction","Average test error (primary metric)","Speedup factor relative to random search or other methods within a fixed resource window","Consistency across trials (low variance)","Average test error","Computation time","Probability of success ($\\ge 1-\\delta$)","Error bounds: $|\\hat{\\nu}_i - \\nu^*|$","Sample complexity (number of measurements)","validation accuracy","training time efficiency (FLOPs or wall-clock time)","regret bounds compared to random search and Bayesian optimization"],"reported_results":[{"benchmark":"HPOlib & Deep Learning Tasks","algorithm":"","metric_name":"Speedup over Bayesian Optimization (SMAC, TPE)","value":"5x to 30x faster","source":"Section 1 Abstract"},{"benchmark":"Non-stochastic Infinite-Horizon Setting (Theoretical Analysis)","algorithm":"Successive Halving (SH)","metric_name":"$z_{SH}$","value":"$2^{\\lceil \\log_2(n) \\rceil} \\max_{i=2,...,n} i(1 + \\gamma^{-1}(\\max\\{\\frac{\\epsilon}{4}, \\frac{\\nu_i-\\nu_1}{2}\\}))$","source":"Theorem 1 in the paper"},{"benchmark":"Stochastic Infinite-armed Bandits","algorithm":"","metric_name":"νůT - ν*","value":"\\leq c \\left(\\frac{\\log(T)^3 \\log(\\log(T)/\\delta)}{T}\\right)^{1/\\max\\{\\alpha,\\beta\\}}","source":"Theorem 5"},{"benchmark":"Uniform Allocation in Hyperband","algorithm":"","metric_name":"νůT - ν*","value":"\\leq c \\left(\\frac{\\log(T)\\log(\\log(T)/\\delta)}{T}\\right)^{1/(\\alpha+\\beta)}","source":"Theorem 5 (modified proof)"},{"benchmark":"MRBI","algorithm":"","metric_name":"Average Test Error vs. Resource Budget","value":"Hyperband is over an order-of-magnitude faster than standard configuration selection approaches and 5× faster than SMAC (early). See Figure 4(b).","source":"Figure 4(b) and text"},{"benchmark":"SVHN","algorithm":"","metric_name":"Average Test Error vs. Resource Budget","value":"While Hyperband finds good configurations faster, Bayesian methods are competitive here; SMAC (early) even outperforms Hyperband in some cases. See Figure 4(c).","source":"Figure 4(c) and text"},{"benchmark":"OpenML (117 datasets)","algorithm":"","metric_name":"Speedup due to subsampling on specific subsets","value":"On a subset of 21 datasets, Hyperband achieved at least a 3× speedup via 8× downsampling. Full results across all 117 are referenced in Figure 5(a,b) (not fully reproduced here).","source":"Section 4.2.1"},{"benchmark":"Hyperband Brackets","algorithm":"","metric_name":"n_i values for s=4,3,2,1,0","value":"[81, 27, 9, 6, 5]","source":"Table 1"},{"benchmark":"Kernel Regularized Least Squares","algorithm":"","metric_name":"Hyperparameter Space","value":"Learning Rate: log[1e-3, 1e-1], Batch size: log[1e1, 1e3], k2: linear[10,60], k1: linear[5,k2]","source":"Table 4"},{"benchmark":"Random Feature Kernel Approximation","algorithm":"","metric_name":"Hyperparameter Space","value":"preprocessor: [none, min/max, standardize, normalize], lambda: log[1e-3, 1e5], gamma: log[1e-5, 10]","source":"Table 5"}],"notes":{"what_to_know":["Hyperband is theoretically grounded in the **infinite-armed bandit** setting.","It avoids assumptions about convergence rates that often fail empirically (unlike parametric methods).","The method scales well because it does not require fitting complex posterior distributions like Gaussian Processes.","Adaptive Allocation**: Exploits situations where adaptive allocation works well while protecting against cases requiring conservative approaches.","The paper distinguishes between the 'finite horizon' setting ($R < \\infty$, known convergence point) and the 'infinite horizon' setting ($R = \\infty$). Hyperband is analyzed primarily in the infinite-horizon case for theoretical tractability, though finite horizons are more common in practice.","Hyperband dynamically allocates resources by running multiple instances of Successive Halving with different budgets ($B_{k,s} = 2^k, n_{k,s} = 2^s$) and combining their results.","Hyperband addresses the issue of not knowing the optimal $n$ or $B$.","By trying different values in a specific order and doubling the budget, it ensures that the loss from identifying the 'best' setting is no more than $\\log(B)$ times necessary."],"implementation_details":["The function $\\gamma(j)$ represents how quickly a model's validation loss converges. If training on full data takes time $T$, then $\\gamma(k)=0$ for all $k \\ge T$.","On CIFAR-10, state-of-the-art results using more data (including validation set) achieve ~17.0% error vs. our 15.0–18% range depending on setup; this gap is attributed to larger training sets and extended epochs in prior work.","The paper highlights shortcomings in the experimental setup, such as random search testing varying numbers of configurations depending on dataset size.","Some classifiers/preprocessing methods cause memory errors (quadratic storage requirements), which can waste time if a searcher trains on a subsample but fails on the full dataset.","The result highlights a dependency on the maximum of exponents $\\beta$ and $\\alpha$, modulated by logarithmic factors.","Extracted tables from Appendix pages. Table 1 shows Hyperband bracket parameters (n_i, r_i). Tables 4 and 5 define hyperparameter search spaces for specific classification problems."],"issues":[],"warnings":["Consistency Guarantees**: Assumes uniform sampling from hyperparameter space; better priors improve performance.","Cost Trade-off**: Requires approximately (smax + 1) times more work than single-value SuccessiveHalving but removes need for manual n selection.","The paper shows that SuccessiveHalving generally requires less average resource per arm compared to uniform allocation for distinguishing top arms.","Infinite horizon Hyperband underperforms finite version within fixed budgets because it must tune max resource R and starts with less aggressive early stopping.","Hyperband assumes computation scales linearly with data set size; for very small datasets, initialization overheads dominate.","Hyperband is particularly effective when the evaluation of a hyperparameter configuration requires multiple epochs."]}},"repo_context":{"url":"https://github.com/automl/HpBandSter.git","language":"python","build_system":"python -m venv --clear .venv && .venv/bin/pip install -U pip && .venv/bin/pip install . matplotlib pandas scipy scikit-learn","has_code":true,"setup_time_minutes":5.0,"file_tree":"CONTRIBUTING.md, LICENSE, README.md, build/, codecov.yml, docs/, hpbandster.egg-info/, hpbandster/, setup.py, tests/","readme_summary":"HpBandSter ](https://travis-ci.org/automl/HpBandSter) ](https://codecov.io/gh/automl/HpBandSter) a distributed Hyperband implementation on Steroids News: Not Maintained Anymore! Please note that we don't maintain this repository anymore. We also cannot ensure that we can reply to issues in the issue tracker or look into PRs.","example_commands":["python3 setup.py develop --user"],"entrypoint_hints":["setup.py","build/lib/hpbandster/examples/example_1_local_sequential.py","build/lib/hpbandster/examples/example_2_local_parallel_threads.py","build/lib/hpbandster/examples/example_3_local_parallel_processes.py","build/lib/hpbandster/examples/example_4_cluster.py","build/lib/hpbandster/examples/example_5_keras_worker.py","build/lib/hpbandster/examples/example_5_mnist.py","build/lib/hpbandster/examples/example_5_pytorch_worker.py","build/lib/hpbandster/examples/example_8_mnist_continued.py","build/lib/hpbandster/examples/plot_example_6_analysis.py"],"dependency_files":["setup.py"],"has_runnable_experiment_command":true,"execution_surface":"script","has_library_verification":true,"has_script_entrypoints":true,"has_native_build":false,"has_config_files":false,"has_container_files":false,"has_artifact_dirs":false,"repo_path":"/Users/school/ResearchAssistant/data/papers/hbo_baseline/code"},"repo_exploration":{"available":true,"repo_path":"/Users/school/ResearchAssistant/data/papers/hbo_baseline/code","readme_file":"README.md","readme_full":"# HpBandSter [![Build Status](https://travis-ci.org/automl/HpBandSter.svg?branch=master)](https://travis-ci.org/automl/HpBandSter)  [![codecov](https://codecov.io/gh/automl/HpBandSter/branch/master/graph/badge.svg)](https://codecov.io/gh/automl/HpBandSter)\na distributed Hyperband implementation on Steroids\n\n## News: Not Maintained Anymore!\n\nPlease note that we don't maintain this repository anymore. We also cannot ensure that we can reply to issues in the issue tracker or look into PRs. \n\nWe offer two successor  packages which showed in our [HPOBench paper](https://arxiv.org/abs/2109.06716) superior performance:\n\n1. [SMAC3](https://github.com/automl/SMAC3): is a versatile HPO package with different HPO strategies. It also implements the main idea of BOHB, but uses a RF (or GP) as a predictive model instead of a KDE.\n2. [DEHB](https://github.com/automl/dehb): is a HPO package using a combination of differential evolution and hyperband. \n\nIn particular, SMAC3 has an active group of developers working on it and maintaining it. So, we strongly recommend using one of these two packages instead of HPBandSter.\n\n## Overview\n\nThis python 3 package is a framework for distributed hyperparameter optimization.\nIt started out as a simple implementation of [Hyperband (Li et al. 2017)](http://jmlr.org/papers/v18/16-558.html), and contains\nan implementation of [BOHB (Falkner et al. 2018)](http://proceedings.mlr.press/v80/falkner18a.html)\n\n## How to install\n\nWe try to keep the package on PyPI up to date. So you should be able to install it via:\n```\npip install hpbandster\n```\nIf you want to develop on the code you could install it via:\n\n```\npython3 setup.py develop --user\n```\n\n## Documentation\n\nThe documentation is hosted on github pages: [https://automl.github.io/HpBandSter/](https://automl.github.io/HpBandSter/)\nIt contains a quickstart guide with worked out examples to get you started in different circumstances.\nCheck it out if you are interest in applying one of the implemented optimizers to your problem.\n\nWe have also written a [blogpost](https://www.automl.org/blog_bohb/) showcasing the results from our ICML paper.","file_tree_deep":["docs/","docs/source/","docs/source/_templates/","docs/source/core/","docs/source/optimizers/","docs/source/advanced_examples.rst","docs/source/best_practices.rst","docs/source/conf.py","docs/source/contact.rst","docs/source/core_components.rst","docs/source/faq.rst","docs/source/index.rst","docs/source/license.rst","docs/source/optimizers.rst","docs/source/quickstart.rst","docs/index.html","docs/Makefile","hpbandster/","hpbandster/core/","hpbandster/core/__init__.py","hpbandster/core/base_config_generator.py","hpbandster/core/base_iteration.py","hpbandster/core/dispatcher.py","hpbandster/core/master.py","hpbandster/core/nameserver.py","hpbandster/core/result.py","hpbandster/core/worker.py","hpbandster/examples/","hpbandster/examples/example_5_run/","hpbandster/examples/__init__.py","hpbandster/examples/commons.py","hpbandster/examples/example_1_local_sequential.py","hpbandster/examples/example_2_local_parallel_threads.py","hpbandster/examples/example_3_local_parallel_processes.py","hpbandster/examples/example_4_cluster.py","hpbandster/examples/example_5_keras_worker.py","hpbandster/examples/example_5_mnist.py","hpbandster/examples/example_5_pytorch_worker.py","hpbandster/examples/example_8_mnist_continued.py","hpbandster/examples/plot_example_6_analysis.py","hpbandster/examples/plot_example_7_interactive_plot.py","hpbandster/examples/README.txt","hpbandster/optimizers/","hpbandster/optimizers/config_generators/","hpbandster/optimizers/iterations/","hpbandster/optimizers/kde/","hpbandster/optimizers/learning_curve_models/","hpbandster/optimizers/__init__.py","hpbandster/optimizers/bohb.py","hpbandster/optimizers/h2bo.py","hpbandster/optimizers/hyperband.py","hpbandster/optimizers/lcnet.py","hpbandster/optimizers/randomsearch.py","hpbandster/workers/","hpbandster/workers/__init__.py","hpbandster/workers/hpolibbenchmark.py","hpbandster/__init__.py","hpbandster/utils.py","hpbandster/visualization.py","hpbandster.egg-info/","hpbandster.egg-info/dependency_links.txt","hpbandster.egg-info/PKG-INFO","hpbandster.egg-info/requires.txt","hpbandster.egg-info/SOURCES.txt","hpbandster.egg-info/top_level.txt","tests/","tests/__init__.py","tests/test_config_generators.py","tests/test_kde.py","tests/test_kernels.py","tests/test_result.py","tests/test_utils.py","tests/test_worker.py","codecov.yml","CONTRIBUTING.md","LICENSE","README.md","setup.py"],"example_commands":["python3 setup.py develop --user"],"entrypoint_hints":["setup.py","build/lib/hpbandster/examples/example_1_local_sequential.py","build/lib/hpbandster/examples/example_2_local_parallel_threads.py","build/lib/hpbandster/examples/example_3_local_parallel_processes.py","build/lib/hpbandster/examples/example_4_cluster.py","build/lib/hpbandster/examples/example_5_keras_worker.py","build/lib/hpbandster/examples/example_5_mnist.py","build/lib/hpbandster/examples/example_5_pytorch_worker.py","build/lib/hpbandster/examples/example_8_mnist_continued.py","build/lib/hpbandster/examples/plot_example_6_analysis.py"],"registry_ids":{"functions_or_benchmarks":[],"algorithms_or_methods":[]},"cli_flags":["worker","backend"],"experiment_candidates":[],"test_files":["tests/test_kernels.py","tests/test_config_generators.py","tests/test_kde.py","tests/test_result.py","tests/test_utils.py","tests/test_worker.py"],"notebooks":[],"script_entrypoints":["setup.py","build/lib/hpbandster/examples/example_1_local_sequential.py","build/lib/hpbandster/examples/example_2_local_parallel_threads.py","build/lib/hpbandster/examples/example_3_local_parallel_processes.py","build/lib/hpbandster/examples/example_4_cluster.py","build/lib/hpbandster/examples/example_5_keras_worker.py","build/lib/hpbandster/examples/example_5_mnist.py","build/lib/hpbandster/examples/example_5_pytorch_worker.py","build/lib/hpbandster/examples/example_8_mnist_continued.py","build/lib/hpbandster/examples/plot_example_6_analysis.py"],"script_tunables":{},"native_build":{"available":false,"files":[],"commands":[]},"native_tests":[],"config_files":[],"container_files":[],"make_targets":[],"artifact_dirs":[],"library_verification_commands":["python tests/test_kernels.py","python tests/test_config_generators.py","python tests/test_kde.py","python tests/test_result.py","python tests/test_utils.py","python tests/test_worker.py"],"verification_commands":["python3 setup.py develop --user","python setup.py","python build/lib/hpbandster/examples/example_1_local_sequential.py","python build/lib/hpbandster/examples/example_2_local_parallel_threads.py","python build/lib/hpbandster/examples/example_3_local_parallel_processes.py","python build/lib/hpbandster/examples/example_4_cluster.py","python build/lib/hpbandster/examples/example_5_keras_worker.py","python build/lib/hpbandster/examples/example_5_mnist.py","python build/lib/hpbandster/examples/example_5_pytorch_worker.py","python build/lib/hpbandster/examples/example_8_mnist_continued.py","python build/lib/hpbandster/examples/plot_example_6_analysis.py","python tests/test_kernels.py","python tests/test_config_generators.py","python tests/test_kde.py","python tests/test_result.py","python tests/test_utils.py","python tests/test_worker.py"],"execution_surface":"script","source_excerpts":[{"path":"setup.py","chars":721,"excerpt":"from setuptools import setup, find_packages\n\nsetup(\n\tname='hpbandster',\n\tversion='0.7.4',\n\tdescription='HyPerBAND on STERoids, a distributed Hyperband implementation with lots of room for improvement',\n\tauthor='Stefan Falkner',\n\tauthor_email='sfalkner@cs.uni-freiburg.de',\n\turl=\"https://github.com/automl/HpBandSter\",\n\tlicense='BSD 3-Clause License',\n\tclassifiers=['Development Status :: 4 - Beta'],\n\tpackages=find_packages(),\n\tpython_requires='>=3',\n\tinstall_requires=['Pyro4', 'serpent', 'ConfigSpace', 'numpy','statsmodels', 'scipy', 'netifaces'],\n\textras_require = {\n\t\t'docu': ['sphinx', 'sphinx_rtd_theme', 'sphinx_gallery'],\n\t},\n\tkeywords=['distributed', 'optimization', 'multifidelity'],\n    \ttest_suite=\"tests\"\n)"},{"path":"build/lib/hpbandster/examples/example_1_local_sequential.py","chars":3043,"excerpt":"\"\"\"\nExample 1 - Local and Sequential\n================================\n\n\"\"\"\nimport logging\nlogging.basicConfig(level=logging.WARNING)\n\nimport argparse\n\nimport hpbandster.core.nameserver as hpns\nimport hpbandster.core.result as hpres\n\nfrom hpbandster.optimizers import BOHB as BOHB\nfrom hpbandster.examples.commons import MyWorker\n\n\n\nparser = argparse.ArgumentParser(description='Example 1 - sequential and local execution.')\nparser.add_argument('--min_budget',   type=float, help='Minimum budget used during the optimization.',    default=9)\nparser.add_argument('--max_budget',   type=float, help='Maximum budget used during the optimization.',    default=243)\nparser.add_argument('--n_iterations', type=int,   help='Number of iterations performed by the optimizer', default=4)\nargs=parser.parse_args()\n\n\n# Step 1: Start a nameserver\n# Every run needs a nameserver. It could be a 'static' server with a\n# permanent address, but here it will be started for the local machine with the default port.\n# The nameserver manages the concurrent running workers across all possible threads or clusternodes.\n# Note the run_id argument. This uniquely identifies a run of any HpBandSter optimizer.\nNS = hpns.NameServer(run_id='example1', host='127.0.0.1', port=None)\nNS.start()\n\n# Step 2: Start a worker\n# Now we can instantiate a worker, providing the mandatory information\n# Besides the sleep_interval, we need to define the nameserver information and\n# the same run_id as above. After that, we can start the worker in the background,\n# where it will wait for incoming configurations to evaluate.\nw = MyWorker(sleep_interval = 0, nameserver='127.0.0.1',run_id='example1')\nw.run(background=True)\n\n# Step 3: Run an optimizer\n# Now we can create an optimizer object and start the run.\n# Here, we run BOHB, but that is not essential.\n# The run method will return the `Result` that contains all runs performed.\nbohb = BOHB(  configspace = w.get_configspace(),\n              run_id = 'example1', nameserver='127.0.0.1',\n              min_budget=args.min_budget, max_budget=args.max_budget\n           )\nres = bohb.run(n_iterations=args.n_iterations)\n\n# Step 4: Shutdown\n# After the optimizer run, we must shutdown the master and the nameserver.\nbohb.shutdown(shutdown_workers=True)\nNS.shutdown()\n\n# Step 5: Analysis\n# Each optimizer returns a hpbandster.core.result.Result object.\n# It holds informations about the optimization run like the incumbent (=best) configuration.\n# For further details ab\n...[truncated]..."},{"path":"build/lib/hpbandster/examples/example_2_local_parallel_threads.py","chars":3838,"excerpt":"\"\"\"\nExample 2 - Local and Parallel (using threads)\n==============================================\n\nThis example extends example 1 to multiple parallel workers.\nFor demonstrational purposes, the workers are started in separate threads.\nThis is probably not the most common use case but serves as a nice example.\nThe setup can be useful if the workers do their computations outside Python's Global Interpreter Lock, e.g. in some 3rd party extension in C/C++.\nIn that case, all workers can truely work in parallel.\n\n\"\"\"\nimport logging\nlogging.basicConfig(level=logging.WARNING)\n\nimport argparse\n\nimport hpbandster.core.nameserver as hpns\nimport hpbandster.core.result as hpres\n\nfrom hpbandster.optimizers import BOHB as BOHB\nfrom hpbandster.examples.commons import MyWorker\n\n\n\nparser = argparse.ArgumentParser(description='Example 1 - sequential and local execution.')\nparser.add_argument('--min_budget',   type=float, help='Minimum budget used during the optimization.',    default=9)\nparser.add_argument('--max_budget',   type=float, help='Maximum budget used during the optimization.',    default=243)\nparser.add_argument('--n_iterations', type=int,   help='Number of iterations performed by the optimizer', default=4)\nparser.add_argument('--n_workers', type=int,   help='Number of workers to run in parallel.', default=2)\n\nargs=parser.parse_args()\n\n\n# Step 1: Start a nameserver (see example_1)\nNS = hpns.NameServer(run_id='example2', host='127.0.0.1', port=None)\nNS.start()\n\n# Step 2: Start the workers\n# Now we can instantiate the specified number of workers. To emphasize the effect,\n# we introduce a sleep_interval of one second, which makes every function evaluation\n# take a bit of time. Note the additional id argument that helps separating the\n# individual workers. This is necessary because every worker uses its processes\n# ID which is the same for all threads here.\nworkers=[]\nfor i in range(args.n_workers):\n\tw = MyWorker(sleep_interval = 0.5, nameserver='127.0.0.1',run_id='example2', id=i)\n\tw.run(background=True)\n\tworkers.append(w)\n\n# Step 3: Run an optimizer\n# Now we can create an optimizer object and start the run.\n# We add the min_n_workers argument to the run methods to make the optimizer wait\n# for all workers to start. This is not mandatory, and workers can be added\n# at any time, but if the timing of the run is essential, this can be used to\n# synchronize all workers right at the start.\nbohb = BOHB(  configspace = w.get_configspace(),\n...[truncated]..."},{"path":"build/lib/hpbandster/examples/example_3_local_parallel_processes.py","chars":3038,"excerpt":"\"\"\"\nExample 3 - Local and Parallel (using processes)\n================================================\n\nGetting closer to a distributed setup, this examples shows how to connect a nameserver, an optimizer and several workers running in different processes.\nThis would also allow true parallelism if the workers do all the computation in Python, such that the thread based paralelization of example 2 would not work.\n\n\"\"\"\nimport logging\nlogging.basicConfig(level=logging.INFO)\n\nimport argparse\n\nimport hpbandster.core.nameserver as hpns\nimport hpbandster.core.result as hpres\n\nfrom hpbandster.optimizers import BOHB as BOHB\nfrom hpbandster.examples.commons import MyWorker\n\n\n\nparser = argparse.ArgumentParser(description='Example 3 - Local and Parallel Execution.')\nparser.add_argument('--min_budget',   type=float, help='Minimum budget used during the optimization.',    default=9)\nparser.add_argument('--max_budget',   type=float, help='Maximum budget used during the optimization.',    default=243)\nparser.add_argument('--n_iterations', type=int,   help='Number of iterations performed by the optimizer', default=4)\nparser.add_argument('--n_workers', type=int,   help='Number of workers to run in parallel.', default=2)\nparser.add_argument('--worker', help='Flag to turn this into a worker process', action='store_true')\n\nargs=parser.parse_args()\n\n\n\nif args.worker:\n\tw = MyWorker(sleep_interval = 0.5, nameserver='127.0.0.1',run_id='example3')\n\tw.run(background=False)\n\texit(0)\n\n# Start a nameserver (see example_1)\nNS = hpns.NameServer(run_id='example3', host='127.0.0.1', port=None)\nNS.start()\n\n\n# Run an optimizer (see example_2)\nbohb = BOHB(  configspace = MyWorker.get_configspace(),\n\t\t\t  run_id = 'example3',\n\t\t\t  min_budget=args.min_budget, max_budget=args.max_budget\n\t\t   )\nres = bohb.run(n_iterations=args.n_iterations, min_n_workers=args.n_workers)\n\n# Step 4: Shutdown\n# After the optimizer run, we must shutdown the master and the nameserver.\nbohb.shutdown(shutdown_workers=True)\nNS.shutdown()\n\n# Step 5: Analysis\n# Each optimizer returns a hpbandster.core.result.Result object.\n# It holds informations about the optimization run like the incumbent (=best) configuration.\n# For further details about the Result object, see its documentation.\n# Here we simply print out the best config and some statistics about the performed runs.\nid2config = res.get_id2config_mapping()\nincumbent = res.get_incumbent_id()\n\nall_runs = res.get_all_runs()\n\nprint('Best found configuratio\n...[truncated]..."},{"path":"build/lib/hpbandster/examples/example_4_cluster.py","chars":4792,"excerpt":"\"\"\"\nExample 4 - on the cluster\n==========================\n\nThis example shows how to run HpBandster in a cluster environment.\nThe actual python code does differ substantially from example 3, except for a\nshared directory that is used to communicate the location of the nameserver to\nevery worker, and the fact that the communication is done over the network instead\nof just the loop back interface.\n\n\nTo actually run it as a batch job, usually a shell script is required.\nThose differer slightly from scheduler to scheduler.\nHere we provide an example script for the Sun Grid Engine (SGE), but adapting that to\nany other scheduler should be easy.\nThe script simply specifies the logging files for output (`-o`) and error `-e`),\nloads a virtual environment, and then executes the master for the first array task\nand a worker otherwise.\nArray jobs execute the same source multiple times and are bundled together into one job,\nwhere each task gets a unique task ID.\nFor SGE those IDs are positive integers and we simply say the first task is the master.\n\n\n.. code-block:: bash\n\n   # submit via qsub -t 1-4 -q test_core.q example_4_cluster_submit_me.sh\n\n   #$ -cwd\n   #$ -o $JOB_ID-$TASK_ID.o\n   #$ -e $JOB_ID-$TASK_ID.e\n\n   # enter the virtual environment\n   source ~sfalkner/virtualenvs/HpBandSter_tests/bin/activate\n\n\n   if [ $SGE_TASK_ID -eq 1]\n      then python3 example_4_cluster.py --run_id $JOB_ID --nic_name eth0 --working_dir .\n   else \n      python3 example_4_cluster.py --run_id $JOB_ID --nic_name eth0  --working_dir . --worker\n   fi\n\nYou can simply copy the above code into a file, say submit_me.sh, and tell SGE to run it via:\n\n.. code-block:: bash\n\n   qsub -t 1-4 -q your_queue_name submit_me.sh\n\n\nNow to the actual python source:\n\"\"\"\nimport logging\nlogging.basicConfig(level=logging.INFO)\n\nimport argparse\nimport pickle\nimport time\n\nimport hpbandster.core.nameserver as hpns\nimport hpbandster.core.result as hpres\n\nfrom hpbandster.optimizers import BOHB as BOHB\nfrom hpbandster.examples.commons import MyWorker\n\n\n\nparser = argparse.ArgumentParser(description='Example 1 - sequential and local execution.')\nparser.add_argument('--min_budget',   type=float, help='Minimum budget used during the optimization.',    default=9)\nparser.add_argument('--max_budget',   type=float, help='Maximum budget used during the optimization.',    default=243)\nparser.add_argument('--n_iterations', type=int,   help='Number of iterations performed by the optimizer', default=4)\nparser.a\n...[truncated]..."},{"path":"build/lib/hpbandster/examples/example_5_keras_worker.py","chars":9843,"excerpt":"\"\"\"\nWorker for Example 5 - Keras\n============================\n\nIn this example implements a small CNN in Keras to train it on MNIST.\nThe configuration space shows the most common types of hyperparameters and\neven contains conditional dependencies.\n\nWe'll optimise the following hyperparameters:\n\n+-------------------------+----------------+-----------------+------------------------+\n| Parameter Name          | Parameter type |  Range/Choices  | Comment                |\n+=========================+================+=================+========================+\n| Learning rate           |  float         | [1e-6, 1e-2]    | varied logarithmically |\n+-------------------------+----------------+-----------------+------------------------+\n| Optimizer               | categorical    | {Adam, SGD }    | discrete choice        |\n+-------------------------+----------------+-----------------+------------------------+\n| SGD momentum            |  float         | [0, 0.99]       | only active if         |\n|                         |                |                 | optimizer == SGD       |\n+-------------------------+----------------+-----------------+------------------------+\n| Number of conv layers   | integer        | [1,3]           | can only take integer  |\n|                         |                |                 | values 1, 2, or 3      |\n+-------------------------+----------------+-----------------+------------------------+\n| Number of filters in    | integer        | [4, 64]         | logarithmically varied |\n| the first conf layer    |                |                 | integer values         |\n+-------------------------+----------------+-----------------+------------------------+\n| Number of filters in    | integer        | [4, 64]         | only active if number  |\n| the second conf layer   |                |                 | of layers >= 2         |\n+-------------------------+----------------+-----------------+------------------------+\n| Number of filters in    | integer        | [4, 64]         | only active if number  |\n| the third conf layer    |                |                 | of layers == 3         |\n+-------------------------+----------------+-----------------+------------------------+\n| Dropout rate            |  float         | [0, 0.9]        | standard continuous    |\n|                         |                |                 | parameter              |\n+-------------------------+----------------+-----------------+----------\n...[truncated]..."}],"exploration_notes":["Start from README, then file_tree_deep, then source_excerpts.","execution_surface=script; use matching evidence lists for phases.","Prefer compact axes + a few example matrix rows (run_command/code_refs/verify).","Do not invent files or CLI IDs outside this exploration.","Some source excerpts were truncated to fit the Planner context budget."]},"paper_context":{"paper_id":"hbo_baseline","title":"hbo_baseline","pdf_path":"/Users/school/ResearchAssistant/data/papers/hbo_baseline/paper.pdf","arxiv_id":null},"flags":{"has_research_question":true,"has_methodology":true,"has_code_repo":true,"has_datasets":true,"paper_type":"methods"},"results_contract":{"results_root":"results/hbo_baseline","summary_path":"results/hbo_baseline/summary.json","run_dir_pattern":"YYYY-MM-DD_HH-MM-SS__{benchmark_slug}__{method_slug}__seed-{seed}","metrics_filename":"metrics.csv","logs_filename":"logs.txt"},"phase_scaffold":[{"phase_id":"setup","title":"Environment setup","goal":"Install repository dependencies and confirm entrypoints from README.","depends_on":[],"variables":[],"axes":{},"run_template":"python -m venv --clear .venv && .venv/bin/pip install -U pip && .venv/bin/pip install . matplotlib pandas scipy scikit-learn","matrix":[],"planned_actions":"Install dependencies from README/requirements, confirm script entrypoints exist, and note in-file tunables (dataset/method) before running experiments.","results_path":"results/hbo_baseline"},{"phase_id":"smoke","title":"Script smoke run","goal":"Run one README/script entrypoint to validate install and outputs.","depends_on":["setup"],"variables":["script"],"axes":{"script":["build/lib/hpbandster/examples/example_1_local_sequential.py"]},"run_template":"python {script}","matrix":[{"name":"smoke__example_1_local_sequential","variables":{"script":"build/lib/hpbandster/examples/example_1_local_sequential.py"},"run_command":"python build/lib/hpbandster/examples/example_1_local_sequential.py","code_refs":["build/lib/hpbandster/examples/example_1_local_sequential.py","README.md","build/lib/hpbandster/examples/example_2_local_parallel_threads.py"],"verify":["exit_code:0","exists:results/hbo_baseline/smoke"],"results_path":"results/hbo_baseline/smoke","metrics":["Test accuracy / validation loss reduction speed","Validation loss (intermediate losses)"],"source":"repo"}],"planned_actions":"Execute `python build/lib/hpbandster/examples/example_1_local_sequential.py` once; confirm it starts and writes logs.","results_path":"results/hbo_baseline/smoke"},{"phase_id":"experiments","title":"Script experiments","goal":"Run grounded script entrypoints (or scraped dataset×method grid) serially.","depends_on":["smoke"],"variables":["script"],"axes":{"script":["build/lib/hpbandster/examples/example_1_local_sequential.py","build/lib/hpbandster/examples/example_2_local_parallel_threads.py","build/lib/hpbandster/examples/example_3_local_parallel_processes.py","build/lib/hpbandster/examples/example_4_cluster.py","build/lib/hpbandster/examples/example_5_keras_worker.py","build/lib/hpbandster/examples/example_5_mnist.py"]},"run_template":"python {script}","matrix":[{"name":"exp__example_1_local_sequential","variables":{"script":"build/lib/hpbandster/examples/example_1_local_sequential.py"},"run_command":"python build/lib/hpbandster/examples/example_1_local_sequential.py","code_refs":["build/lib/hpbandster/examples/example_1_local_sequential.py","README.md","build/lib/hpbandster/examples/example_2_local_parallel_threads.py"],"verify":["exit_code:0","exists:results/hbo_baseline/experiments/example_1_local_sequential"],"results_path":"results/hbo_baseline/experiments/example_1_local_sequential","metrics":["Test accuracy / validation loss reduction speed","Validation loss (intermediate losses)","Test error rate across multiple trials"],"source":"repo"},{"name":"exp__example_2_local_parallel_threads","variables":{"script":"build/lib/hpbandster/examples/example_2_local_parallel_threads.py"},"run_command":"python build/lib/hpbandster/examples/example_2_local_parallel_threads.py","code_refs":["build/lib/hpbandster/examples/example_2_local_parallel_threads.py","README.md","build/lib/hpbandster/examples/example_1_local_sequential.py"],"verify":["exit_code:0","exists:results/hbo_baseline/experiments/example_2_local_parallel_threads"],"results_path":"results/hbo_baseline/experiments/example_2_local_parallel_threads","metrics":["Test accuracy / validation loss reduction speed","Validation loss (intermediate losses)","Test error rate across multiple trials"],"source":"repo"},{"name":"exp__example_3_local_parallel_processes","variables":{"script":"build/lib/hpbandster/examples/example_3_local_parallel_processes.py"},"run_command":"python build/lib/hpbandster/examples/example_3_local_parallel_processes.py","code_refs":["build/lib/hpbandster/examples/example_3_local_parallel_processes.py","README.md","build/lib/hpbandster/examples/example_1_local_sequential.py","build/lib/hpbandster/examples/example_2_local_parallel_threads.py"],"verify":["exit_code:0","exists:results/hbo_baseline/experiments/example_3_local_parallel_processes"],"results_path":"results/hbo_baseline/experiments/example_3_local_parallel_processes","metrics":["Test accuracy / validation loss reduction speed","Validation loss (intermediate losses)","Test error rate across multiple trials"],"source":"repo"},{"name":"exp__example_4_cluster","variables":{"script":"build/lib/hpbandster/examples/example_4_cluster.py"},"run_command":"python build/lib/hpbandster/examples/example_4_cluster.py","code_refs":["build/lib/hpbandster/examples/example_4_cluster.py","README.md","build/lib/hpbandster/examples/example_1_local_sequential.py","build/lib/hpbandster/examples/example_2_local_parallel_threads.py"],"verify":["exit_code:0","exists:results/hbo_baseline/experiments/example_4_cluster"],"results_path":"results/hbo_baseline/experiments/example_4_cluster","metrics":["Test accuracy / validation loss reduction speed","Validation loss (intermediate losses)","Test error rate across multiple trials"],"source":"repo"},{"name":"exp__example_5_keras_worker","variables":{"script":"build/lib/hpbandster/examples/example_5_keras_worker.py"},"run_command":"python build/lib/hpbandster/examples/example_5_keras_worker.py","code_refs":["build/lib/hpbandster/examples/example_5_keras_worker.py","README.md","build/lib/hpbandster/examples/example_1_local_sequential.py","build/lib/hpbandster/examples/example_2_local_parallel_threads.py"],"verify":["exit_code:0","exists:results/hbo_baseline/experiments/example_5_keras_worker"],"results_path":"results/hbo_baseline/experiments/example_5_keras_worker","metrics":["Test accuracy / validation loss reduction speed","Validation loss (intermediate losses)","Test error rate across multiple trials"],"source":"repo"},{"name":"exp__example_5_mnist","variables":{"script":"build/lib/hpbandster/examples/example_5_mnist.py"},"run_command":"python build/lib/hpbandster/examples/example_5_mnist.py","code_refs":["build/lib/hpbandster/examples/example_5_mnist.py","README.md","build/lib/hpbandster/examples/example_1_local_sequential.py","build/lib/hpbandster/examples/example_2_local_parallel_threads.py"],"verify":["exit_code:0","exists:results/hbo_baseline/experiments/example_5_mnist"],"results_path":"results/hbo_baseline/experiments/example_5_mnist","metrics":["Test accuracy / validation loss reduction speed","Validation loss (intermediate losses)","Test error rate across multiple trials"],"source":"repo"}],"planned_actions":"Edit in-file tunables when axes come from script scrape; do not invent CLI flags. Record dataset availability gaps in missing_context.","results_path":"results/hbo_baseline/experiments"},{"phase_id":"summarize","title":"Aggregate results","goal":"Write/update summary.json aggregates from phase logs.","depends_on":["experiments"],"variables":[],"axes":{},"run_template":"","matrix":[],"planned_actions":"Collect metrics under results/hbo_baseline into results/hbo_baseline/summary.json; do not invent measured values.","results_path":"results/hbo_baseline/summary.json"}]}
+        END_CONTEXT
+
+        Do not summarize the context. Return the Planner envelope now.
+        Required top-level skeleton:
+        {"schema_version":"2.0","agent":"planner","status":"ok|partial|blocked","unknowns":[],"warnings":[],"payload":{"plan_summary":"","domain":"","objective":"","phases":[],"assumptions":[],"constraints":[],"missing_context":[],"verification_checks":[],"risks":[],"organization":[],"execution":[],"repo_usage":[],"engineer_notes":[],"results_summary_path":""}}
+```
+
+#### Raw model response
+```text
+{ "schema_version": "2.0", "agent": "planner", "status": "ok", "payload": { "plan_summary": "Execute the hbo_baseline methodology by installing dependencies, validating entrypoints via a smoke test on example_1_local_sequential.py, and then serially running all 6 available script examples (sequential, parallel threads/processes/cluster, keras worker, mnist) to gather metrics. Finally, aggregate results into summary.json.", "domain": "Hyperparameter Optimization / Machine Learning Baselines", "objective": "Validate the hbo_baseline repository functionality across its provided example scripts and collect performance metrics (accuracy, loss reduction speed).", "phases": [ { "phase_id": "setup", "title": "Environment setup", "goal": "Install repository dependencies and confirm entrypoints from README.", "depends_on": [], "variables": [], "axes": {}, "run_template": "python -m venv --clear .venv && .venv/bin/pip install -U pip && .venv/bin/pip install . matplotlib pandas scipy scikit-learn", "matrix": [], "planned_actions": "Install dependencies from README/requirements, confirm script entrypoints exist, and note in-file tunables (dataset/method) before running experiments.", "results_path": "results/hbo_baseline" }, { "phase_id": "smoke", "title": "Script smoke run", "goal": "Run one README/script entrypoint to validate install and outputs.", "depends_on": [ "setup" ], "variables": [ "script" ], "axes": { "script": [ "build/lib/hpbandster/examples/example_1_local_sequential.py" ] }, "run_template": "python {script}", "matrix": [ { "name": "smoke__example_1_local_sequential", "variables": { "script": "build/lib/hpbandster/examples/example_1_local_sequential.py" }, "run_command": "python build/lib/hpbandster/examples/example_1_local_sequential.py", "code_refs": [ "build/lib/hpbandster/examples/example_1_local_sequential.py", "README.md", "build/lib/hpbandster/examples/example_2_local_parallel_threads.py" ], "verify": [ "exit_code:0", "exists:results/hbo_baseline/smoke" ], "results_path": "results/hbo_baseline/smoke", "metrics": [ "Test accuracy / validation loss reduction speed", "Validation loss (intermediate losses)" ], "source": "repo" } ], "planned_actions": "Execute `python build/lib/hpbandster/examples/example_1_local_sequential.py` once; confirm it starts and writes logs.", "results_path": "results/hbo_baseline/smoke" }, { "phase_id": "experiments", "title": "Script experiments", "goal": "Run grounded script entrypoints (or scraped dataset×method grid) serially.", "depends_on": [ "smoke" ], "variables": [ "script" ], "axes": { "script": [ "build/lib/hpbandster/examples/example_1_local_sequential.py", "build/lib/hpbandster/examples/example_2_local_parallel_threads.py", "build/lib/hpbandster/examples/example_3_local_parallel_processes.py", "build/lib/hpbandster/examples/example_4_cluster.py", "build/lib/hpbandster/examples/example_5_keras_worker.py", "build/lib/hpbandster/examples/example_5_mnist.py" ] }, "run_template": "python {script}", "matrix": [ { "name": "exp__example_1_local_sequential", "variables": { "script": "build/lib/hpbandster/examples/example_1_local_sequential.py" }, "run_command": "python build/lib/hpbandster/examples/example_1_local_sequential.py", "code_refs": [ "build/lib/hpbandster/examples/example_1_local_sequential.py", "README.md", "build/lib/hpbandster/examples/example_2_local_parallel_threads.py" ], "verify": [ "exit_code:0", "exists:results/hbo_baseline/experiments/example_1_local_sequential" ], "results_path": "results/hbo_baseline/experiments/example_1_local_sequential", "metrics": [ "Test accuracy / validation loss reduction speed", "Validation loss (intermediate losses)", "Test error rate across multiple trials" ], "source": "repo" }, { "name": "exp__example_2_local_parallel_threads", "variables": { "script": "build/lib/hpbandster/examples/example_2_local_parallel_threads.py" }, "run_command": "python build/lib/hpbandster/examples/example_2_local_parallel_threads.py", "code_refs": [ "build/lib/hpbandster/examples/example_2_local_parallel_threads.py", "README.md", "build/lib/hpbandster/examples/example_1_local_sequential.py" ], "verify": [ "exit_code:0", "exists:results/hbo_baseline/experiments/example_2_local_parallel_threads" ], "results_path": "results/hbo_baseline/experiments/example_2_local_parallel_threads", "metrics": [ "Test accuracy / validation loss reduction speed", "Validation loss (intermediate losses)", "Test error rate across multiple trials" ], "source": "repo" }, { "name": "exp__example_3_local_parallel_processes", "variables": { "script": "build/lib/hpbandster/examples/example_3_local_parallel_processes.py" }, "run_command": "python build/lib/hpbandster/examples/example_3_local_parallel_processes.py", "code_refs": [ "build/lib/hpbandster/examples/example_3_local_parallel_processes.py", "README.md", "build/lib/hpbandster/examples/example_1_local_sequential.py", "build/lib/hpbandster/examples/example_2_local_parallel_threads.py" ], "verify": [ "exit_code:0", "exists:results/hbo_baseline/experiments/example_3_local_parallel_processes" ], "results_path": "results/hbo_baseline/experiments/example_3_local_parallel_processes", "metrics": [ "Test accuracy / validation loss reduction speed", "Validation loss (intermediate losses)", "Test error rate across multiple trials" ], "source": "repo" }, { "name": "exp__example_4_cluster", "variables": { "script": "build/lib/hpbandster/examples/example_4_cluster.py" }, "run_command": "python build/lib/hpbandster/examples/example_4_cluster.py", "code_refs": [ "build/lib/hpbandster/examples/example_4_cluster.py", "README.md", "build/lib/hpbandster/examples/example_1_local_sequential.py", "build/lib/hpbandster/examples/example_2_local_parallel_threads.py" ], "verify": [ "exit_code:0", "exists:results/hbo_baseline/experiments/example_4_cluster" ], "results_path": "results/hbo_baseline/experiments/example_4_cluster", "metrics": [ "Test accuracy / validation loss reduction speed", "Validation loss (intermediate losses)", "Test error rate across multiple trials" ], "source": "repo" }, { "name": "exp__example_5_keras_worker", "variables": { "script": "build/lib/hpbandster/examples/example_5_keras_worker.py" }, "run_command": "python build/lib/hpbandster/examples/example_5_keras_worker.py", "code_refs": [ "build/lib/hpbandster/examples/example_5_keras_worker.py", "README.md", "build/lib/hpbandster/examples/example_1_local_sequential.py", "build/lib/hpbandster/examples/example_2_local_parallel_threads.py" ], "verify": [ "exit_code:0", "exists:results/hbo_baseline/experiments/example_5_keras_worker" ], "results_path": "results/hbo_baseline/experiments/example_5_keras_worker", "metrics": [ "Test accuracy / validation loss reduction speed", "Validation loss (intermediate losses)", "Test error rate across multiple trials" ], "source": "repo" }, { "name": "exp__example_5_mnist", "variables": { "script": "build/lib/hpbandster/examples/example_5_mnist.py" }, "run_command": "python build/lib/hpbandster/examples/example_5_mnist.py", "code_refs": [ "build/lib/hpbandster/examples/example_5_mnist.py", "README.md", "build/lib/hpbandster/examples/example_1_local_sequential.py", "build/lib/hpbandster/examples/example_2_local_parallel_threads.py" ], "verify": [ "exit_code:0", "exists:results/hbo_baseline/experiments/example_5_mnist" ], "results_path": "results/hbo_baseline/experiments/example_5_mnist", "metrics": [ "Test accuracy / validation loss reduction speed", "Validation loss (intermediate losses)", "Test error rate across multiple trials" ], "source": "repo" } ], "planned_actions": "Edit in-file tunables when axes come from script scrape; do not invent CLI flags. Record dataset availability gaps in missing_context.", "results_path": "results/hbo_baseline/experiments" }, { "phase_id": "summarize", "title": "Aggregate results", "goal": "Write/update summary.json aggregates from phase logs.", "depends_on": [ "experiments" ], "variables": [], "axes": {}, "run_template": "", "matrix": [], "planned_actions": "Collect metrics under results/hbo_baseline into results/hbo_baseline/summary.json; do not invent measured values.", "results_path": "results/hbo_baseline/summary.json" } ], "assumptions": [ "The repository structure matches
+```
+
+#### Parsed JSON
+_not parsed_
+
+### Attempt 2
+- reminder: `strict`
+- outcome: `accepted`
+- error: none
+- user_prompt chars: 44233
+
+#### User prompt (what the model saw this call)
+```text
+Create an Engineer-ready phase-DAG plan from this unified Planner input.
+        Use analyst_output as paper ground truth.
+        Prefer phase_scaffold for axes/matrix/goals on experiment phases; enrich
+        objective, plan_summary, setup/summarize notes, organization, execution,
+        and repo_usage. Do not expand full cartesian products.
+        Honor repo_context, flags, and the code-owned results_contract.
+
+        Context JSON:
+        {"analyst_output":{"research_question":"How does Hyperband improve hyperparameter optimization efficiency compared to Bayesian methods?","paper_overview":"The paper introduces **Hyperband**, a novel approach for hyperparameter optimization that frames the problem as an adaptive resource allocation task. Unlike traditional Bayesian Optimization (BO) which assumes smoothness or low effective dimensions, Hyperband uses early stopping on partially trained models to efficiently discard poor configurations while investing more resources in promising ones.","methodology":"1. **Adaptive Resource Allocation**: Instead of training all configurations fully, Hyperband allocates computational budget (e.g., epochs) dynamically.\n2. **Early Stopping Strategy**: Poor-performing runs are terminated early based on validation loss trends.\n3. **Pure-Exploration Bandit Formulation**: The problem is modeled as an infinite-armed bandit where the goal is to identify good configurations without relying on strong structural assumptions about the objective function.","datasets_or_benchmarks":["HPOlib benchmark library","117 multistage model selection tasks (including deep learning and kernel-based problems)","MNIST dataset","Stochastic Infinite-armed Bandit Setting","General Parametric Assumptions (Equations 5 and 6)","CIFAR-10","MRBI","SVHN","OpenML (117 binary/multiclass classification datasets)","MNIST"],"variables":["R: Maximum resource per configuration (e.g., iterations/epochs)","η: Factor controlling proportion of configurations discarded each round (default=3)","n: Number of configurations","r: Resources allocated to initial batch in a bracket","s: Bracket index determining trade-off between n and r","$\\ell_{i,k}$: Loss at step $k$ for arm $i$","$\\nu_i$: Limit loss of arm $i$ as $k \\to \\infty$","$F$: Cumulative distribution function (CDF) of the limit losses","$\\gamma(j)$: Bound on deviation from limit value after $j$ steps","$R$: Horizon where convergence is guaranteed ($\\gamma(R)=0$)","SuccessiveHalving (SH): Subroutine used by Hyperband to prune arms","n: Number of arms/configurations tested simultaneously","B: Total budget/number of measurements","\\delta: Error probability threshold","α, \\beta: Parameters defining the distribution F (accuracy gap decay)","T: Total exhausted budget","Algorithm type (Hyperband finite/infinite, SMAC, TPE, random search)","Resource budget (measured in multiples of R or iterations)","Dataset size and complexity","Model architecture constraints","Hyperparameters (e.g., C, gamma, degree)","Preprocessing methods (min/max, standardize, normalize)","Kernel types (rbf, polynomial, sigmoid)","\\nu^* (target value)","b_\\nu (estimated lower bound for \\nu^*)","\\gamma, B/n (scaling parameters related to interval widths)","F^{-1} (inverse CDF of the underlying distribution)","n, k, l (sample sizes or iteration indices)","\\delta, c (confidence and absolute constants)","\\alpha, \\beta (exponents governing the tail behavior of F)"],"hyperparameters":{"r":"description_of_parameter_and_its_role_in_the_methodology","η":"description_of_parameter_and_its_role_in_the_methodology","budget_b":"Total computational budget allocated per configuration","n_arms":"Number of hyperparameter configurations sampled simultaneously in Successive Halving","r_k":"Resources (e.g., iterations) allocated to each arm at round $k$ in SH","k_stage_factor":"logarithmic scaling factor for stages in Hyperband","s_parallelism_factor":"Scaling factor determining parallel arms per stage","δ_k_s_error_budget":"\\delta / (2^(k^3))","eta":"value controlling the growth rate between brackets; set to 3 for OpenML experiments, 4 for CIFAR-10 infinite horizon test.","nmax":"maximum number of configurations per bracket; limited to max{9, R/1000} in OpenML study","b":"starting budget for infinite horizon variant","c":"log[10^-3, 10^5]","gamma":"log[10^-5, 10]","degree":"[2, 5] (if kernel=poly)","coef0":"uniform[-1.0, 1.0] (if kernel=poly or sigmoid)","alpha_beta_relation":"The analysis distinguishes between cases where $\\alpha = \\beta$ and $\\alpha \\neq \\beta$, affecting the final bound's form.","confidence_delta":"\\delta controls the failure probability, appearing in logarithmic terms like $\\log(1/\\delta)$.","learning_rate":"adaptive based on performance trends","batch_size":"optimized via bandit allocation","epochs_per_config":"dynamically determined by Hyperband's pruning strategy"},"evaluation_metrics":["Test accuracy / validation loss reduction speed","Validation loss (intermediate losses)","Test error rate across multiple trials","$\\hat{\\nu}$: Estimated best limit loss found with total budget $B$","Regret/Gap: Difference between the optimal possible solution and the achieved solution","Sample Complexity: Total number of resource pulls required to find a near-optimal configuration","Convergence rate of the best arm's mean estimate to true optimum ($\\nu_{ůT} - \\nu_*$)","Total number of samples taken","Probability of selecting an arm within the top q-fraction","Average test error (primary metric)","Speedup factor relative to random search or other methods within a fixed resource window","Consistency across trials (low variance)","Average test error","Computation time","Probability of success ($\\ge 1-\\delta$)","Error bounds: $|\\hat{\\nu}_i - \\nu^*|$","Sample complexity (number of measurements)","validation accuracy","training time efficiency (FLOPs or wall-clock time)","regret bounds compared to random search and Bayesian optimization"],"reported_results":[{"benchmark":"HPOlib & Deep Learning Tasks","algorithm":"","metric_name":"Speedup over Bayesian Optimization (SMAC, TPE)","value":"5x to 30x faster","source":"Section 1 Abstract"},{"benchmark":"Non-stochastic Infinite-Horizon Setting (Theoretical Analysis)","algorithm":"Successive Halving (SH)","metric_name":"$z_{SH}$","value":"$2^{\\lceil \\log_2(n) \\rceil} \\max_{i=2,...,n} i(1 + \\gamma^{-1}(\\max\\{\\frac{\\epsilon}{4}, \\frac{\\nu_i-\\nu_1}{2}\\}))$","source":"Theorem 1 in the paper"},{"benchmark":"Stochastic Infinite-armed Bandits","algorithm":"","metric_name":"νůT - ν*","value":"\\leq c \\left(\\frac{\\log(T)^3 \\log(\\log(T)/\\delta)}{T}\\right)^{1/\\max\\{\\alpha,\\beta\\}}","source":"Theorem 5"},{"benchmark":"Uniform Allocation in Hyperband","algorithm":"","metric_name":"νůT - ν*","value":"\\leq c \\left(\\frac{\\log(T)\\log(\\log(T)/\\delta)}{T}\\right)^{1/(\\alpha+\\beta)}","source":"Theorem 5 (modified proof)"},{"benchmark":"MRBI","algorithm":"","metric_name":"Average Test Error vs. Resource Budget","value":"Hyperband is over an order-of-magnitude faster than standard configuration selection approaches and 5× faster than SMAC (early). See Figure 4(b).","source":"Figure 4(b) and text"},{"benchmark":"SVHN","algorithm":"","metric_name":"Average Test Error vs. Resource Budget","value":"While Hyperband finds good configurations faster, Bayesian methods are competitive here; SMAC (early) even outperforms Hyperband in some cases. See Figure 4(c).","source":"Figure 4(c) and text"},{"benchmark":"OpenML (117 datasets)","algorithm":"","metric_name":"Speedup due to subsampling on specific subsets","value":"On a subset of 21 datasets, Hyperband achieved at least a 3× speedup via 8× downsampling. Full results across all 117 are referenced in Figure 5(a,b) (not fully reproduced here).","source":"Section 4.2.1"},{"benchmark":"Hyperband Brackets","algorithm":"","metric_name":"n_i values for s=4,3,2,1,0","value":"[81, 27, 9, 6, 5]","source":"Table 1"},{"benchmark":"Kernel Regularized Least Squares","algorithm":"","metric_name":"Hyperparameter Space","value":"Learning Rate: log[1e-3, 1e-1], Batch size: log[1e1, 1e3], k2: linear[10,60], k1: linear[5,k2]","source":"Table 4"},{"benchmark":"Random Feature Kernel Approximation","algorithm":"","metric_name":"Hyperparameter Space","value":"preprocessor: [none, min/max, standardize, normalize], lambda: log[1e-3, 1e5], gamma: log[1e-5, 10]","source":"Table 5"}],"notes":{"what_to_know":["Hyperband is theoretically grounded in the **infinite-armed bandit** setting.","It avoids assumptions about convergence rates that often fail empirically (unlike parametric methods).","The method scales well because it does not require fitting complex posterior distributions like Gaussian Processes.","Adaptive Allocation**: Exploits situations where adaptive allocation works well while protecting against cases requiring conservative approaches.","The paper distinguishes between the 'finite horizon' setting ($R < \\infty$, known convergence point) and the 'infinite horizon' setting ($R = \\infty$). Hyperband is analyzed primarily in the infinite-horizon case for theoretical tractability, though finite horizons are more common in practice.","Hyperband dynamically allocates resources by running multiple instances of Successive Halving with different budgets ($B_{k,s} = 2^k, n_{k,s} = 2^s$) and combining their results.","Hyperband addresses the issue of not knowing the optimal $n$ or $B$.","By trying different values in a specific order and doubling the budget, it ensures that the loss from identifying the 'best' setting is no more than $\\log(B)$ times necessary."],"implementation_details":["The function $\\gamma(j)$ represents how quickly a model's validation loss converges. If training on full data takes time $T$, then $\\gamma(k)=0$ for all $k \\ge T$.","On CIFAR-10, state-of-the-art results using more data (including validation set) achieve ~17.0% error vs. our 15.0–18% range depending on setup; this gap is attributed to larger training sets and extended epochs in prior work.","The paper highlights shortcomings in the experimental setup, such as random search testing varying numbers of configurations depending on dataset size.","Some classifiers/preprocessing methods cause memory errors (quadratic storage requirements), which can waste time if a searcher trains on a subsample but fails on the full dataset.","The result highlights a dependency on the maximum of exponents $\\beta$ and $\\alpha$, modulated by logarithmic factors.","Extracted tables from Appendix pages. Table 1 shows Hyperband bracket parameters (n_i, r_i). Tables 4 and 5 define hyperparameter search spaces for specific classification problems."],"issues":[],"warnings":["Consistency Guarantees**: Assumes uniform sampling from hyperparameter space; better priors improve performance.","Cost Trade-off**: Requires approximately (smax + 1) times more work than single-value SuccessiveHalving but removes need for manual n selection.","The paper shows that SuccessiveHalving generally requires less average resource per arm compared to uniform allocation for distinguishing top arms.","Infinite horizon Hyperband underperforms finite version within fixed budgets because it must tune max resource R and starts with less aggressive early stopping.","Hyperband assumes computation scales linearly with data set size; for very small datasets, initialization overheads dominate.","Hyperband is particularly effective when the evaluation of a hyperparameter configuration requires multiple epochs."]}},"repo_context":{"url":"https://github.com/automl/HpBandSter.git","language":"python","build_system":"python -m venv --clear .venv && .venv/bin/pip install -U pip && .venv/bin/pip install . matplotlib pandas scipy scikit-learn","has_code":true,"setup_time_minutes":5.0,"file_tree":"CONTRIBUTING.md, LICENSE, README.md, build/, codecov.yml, docs/, hpbandster.egg-info/, hpbandster/, setup.py, tests/","readme_summary":"HpBandSter ](https://travis-ci.org/automl/HpBandSter) ](https://codecov.io/gh/automl/HpBandSter) a distributed Hyperband implementation on Steroids News: Not Maintained Anymore! Please note that we don't maintain this repository anymore. We also cannot ensure that we can reply to issues in the issue tracker or look into PRs.","example_commands":["python3 setup.py develop --user"],"entrypoint_hints":["setup.py","build/lib/hpbandster/examples/example_1_local_sequential.py","build/lib/hpbandster/examples/example_2_local_parallel_threads.py","build/lib/hpbandster/examples/example_3_local_parallel_processes.py","build/lib/hpbandster/examples/example_4_cluster.py","build/lib/hpbandster/examples/example_5_keras_worker.py","build/lib/hpbandster/examples/example_5_mnist.py","build/lib/hpbandster/examples/example_5_pytorch_worker.py","build/lib/hpbandster/examples/example_8_mnist_continued.py","build/lib/hpbandster/examples/plot_example_6_analysis.py"],"dependency_files":["setup.py"],"has_runnable_experiment_command":true,"execution_surface":"script","has_library_verification":true,"has_script_entrypoints":true,"has_native_build":false,"has_config_files":false,"has_container_files":false,"has_artifact_dirs":false,"repo_path":"/Users/school/ResearchAssistant/data/papers/hbo_baseline/code"},"repo_exploration":{"available":true,"repo_path":"/Users/school/ResearchAssistant/data/papers/hbo_baseline/code","readme_file":"README.md","readme_full":"# HpBandSter [![Build Status](https://travis-ci.org/automl/HpBandSter.svg?branch=master)](https://travis-ci.org/automl/HpBandSter)  [![codecov](https://codecov.io/gh/automl/HpBandSter/branch/master/graph/badge.svg)](https://codecov.io/gh/automl/HpBandSter)\na distributed Hyperband implementation on Steroids\n\n## News: Not Maintained Anymore!\n\nPlease note that we don't maintain this repository anymore. We also cannot ensure that we can reply to issues in the issue tracker or look into PRs. \n\nWe offer two successor  packages which showed in our [HPOBench paper](https://arxiv.org/abs/2109.06716) superior performance:\n\n1. [SMAC3](https://github.com/automl/SMAC3): is a versatile HPO package with different HPO strategies. It also implements the main idea of BOHB, but uses a RF (or GP) as a predictive model instead of a KDE.\n2. [DEHB](https://github.com/automl/dehb): is a HPO package using a combination of differential evolution and hyperband. \n\nIn particular, SMAC3 has an active group of developers working on it and maintaining it. So, we strongly recommend using one of these two packages instead of HPBandSter.\n\n## Overview\n\nThis python 3 package is a framework for distributed hyperparameter optimization.\nIt started out as a simple implementation of [Hyperband (Li et al. 2017)](http://jmlr.org/papers/v18/16-558.html), and contains\nan implementation of [BOHB (Falkner et al. 2018)](http://proceedings.mlr.press/v80/falkner18a.html)\n\n## How to install\n\nWe try to keep the package on PyPI up to date. So you should be able to install it via:\n```\npip install hpbandster\n```\nIf you want to develop on the code you could install it via:\n\n```\npython3 setup.py develop --user\n```\n\n## Documentation\n\nThe documentation is hosted on github pages: [https://automl.github.io/HpBandSter/](https://automl.github.io/HpBandSter/)\nIt contains a quickstart guide with worked out examples to get you started in different circumstances.\nCheck it out if you are interest in applying one of the implemented optimizers to your problem.\n\nWe have also written a [blogpost](https://www.automl.org/blog_bohb/) showcasing the results from our ICML paper.","file_tree_deep":["docs/","docs/source/","docs/source/_templates/","docs/source/core/","docs/source/optimizers/","docs/source/advanced_examples.rst","docs/source/best_practices.rst","docs/source/conf.py","docs/source/contact.rst","docs/source/core_components.rst","docs/source/faq.rst","docs/source/index.rst","docs/source/license.rst","docs/source/optimizers.rst","docs/source/quickstart.rst","docs/index.html","docs/Makefile","hpbandster/","hpbandster/core/","hpbandster/core/__init__.py","hpbandster/core/base_config_generator.py","hpbandster/core/base_iteration.py","hpbandster/core/dispatcher.py","hpbandster/core/master.py","hpbandster/core/nameserver.py","hpbandster/core/result.py","hpbandster/core/worker.py","hpbandster/examples/","hpbandster/examples/example_5_run/","hpbandster/examples/__init__.py","hpbandster/examples/commons.py","hpbandster/examples/example_1_local_sequential.py","hpbandster/examples/example_2_local_parallel_threads.py","hpbandster/examples/example_3_local_parallel_processes.py","hpbandster/examples/example_4_cluster.py","hpbandster/examples/example_5_keras_worker.py","hpbandster/examples/example_5_mnist.py","hpbandster/examples/example_5_pytorch_worker.py","hpbandster/examples/example_8_mnist_continued.py","hpbandster/examples/plot_example_6_analysis.py","hpbandster/examples/plot_example_7_interactive_plot.py","hpbandster/examples/README.txt","hpbandster/optimizers/","hpbandster/optimizers/config_generators/","hpbandster/optimizers/iterations/","hpbandster/optimizers/kde/","hpbandster/optimizers/learning_curve_models/","hpbandster/optimizers/__init__.py","hpbandster/optimizers/bohb.py","hpbandster/optimizers/h2bo.py","hpbandster/optimizers/hyperband.py","hpbandster/optimizers/lcnet.py","hpbandster/optimizers/randomsearch.py","hpbandster/workers/","hpbandster/workers/__init__.py","hpbandster/workers/hpolibbenchmark.py","hpbandster/__init__.py","hpbandster/utils.py","hpbandster/visualization.py","hpbandster.egg-info/","hpbandster.egg-info/dependency_links.txt","hpbandster.egg-info/PKG-INFO","hpbandster.egg-info/requires.txt","hpbandster.egg-info/SOURCES.txt","hpbandster.egg-info/top_level.txt","tests/","tests/__init__.py","tests/test_config_generators.py","tests/test_kde.py","tests/test_kernels.py","tests/test_result.py","tests/test_utils.py","tests/test_worker.py","codecov.yml","CONTRIBUTING.md","LICENSE","README.md","setup.py"],"example_commands":["python3 setup.py develop --user"],"entrypoint_hints":["setup.py","build/lib/hpbandster/examples/example_1_local_sequential.py","build/lib/hpbandster/examples/example_2_local_parallel_threads.py","build/lib/hpbandster/examples/example_3_local_parallel_processes.py","build/lib/hpbandster/examples/example_4_cluster.py","build/lib/hpbandster/examples/example_5_keras_worker.py","build/lib/hpbandster/examples/example_5_mnist.py","build/lib/hpbandster/examples/example_5_pytorch_worker.py","build/lib/hpbandster/examples/example_8_mnist_continued.py","build/lib/hpbandster/examples/plot_example_6_analysis.py"],"registry_ids":{"functions_or_benchmarks":[],"algorithms_or_methods":[]},"cli_flags":["worker","backend"],"experiment_candidates":[],"test_files":["tests/test_kernels.py","tests/test_config_generators.py","tests/test_kde.py","tests/test_result.py","tests/test_utils.py","tests/test_worker.py"],"notebooks":[],"script_entrypoints":["setup.py","build/lib/hpbandster/examples/example_1_local_sequential.py","build/lib/hpbandster/examples/example_2_local_parallel_threads.py","build/lib/hpbandster/examples/example_3_local_parallel_processes.py","build/lib/hpbandster/examples/example_4_cluster.py","build/lib/hpbandster/examples/example_5_keras_worker.py","build/lib/hpbandster/examples/example_5_mnist.py","build/lib/hpbandster/examples/example_5_pytorch_worker.py","build/lib/hpbandster/examples/example_8_mnist_continued.py","build/lib/hpbandster/examples/plot_example_6_analysis.py"],"script_tunables":{},"native_build":{"available":false,"files":[],"commands":[]},"native_tests":[],"config_files":[],"container_files":[],"make_targets":[],"artifact_dirs":[],"library_verification_commands":["python tests/test_kernels.py","python tests/test_config_generators.py","python tests/test_kde.py","python tests/test_result.py","python tests/test_utils.py","python tests/test_worker.py"],"verification_commands":["python3 setup.py develop --user","python setup.py","python build/lib/hpbandster/examples/example_1_local_sequential.py","python build/lib/hpbandster/examples/example_2_local_parallel_threads.py","python build/lib/hpbandster/examples/example_3_local_parallel_processes.py","python build/lib/hpbandster/examples/example_4_cluster.py","python build/lib/hpbandster/examples/example_5_keras_worker.py","python build/lib/hpbandster/examples/example_5_mnist.py","python build/lib/hpbandster/examples/example_5_pytorch_worker.py","python build/lib/hpbandster/examples/example_8_mnist_continued.py","python build/lib/hpbandster/examples/plot_example_6_analysis.py","python tests/test_kernels.py","python tests/test_config_generators.py","python tests/test_kde.py","python tests/test_result.py","python tests/test_utils.py","python tests/test_worker.py"],"execution_surface":"script","source_excerpts":[{"path":"setup.py","chars":721,"excerpt":"from setuptools import setup, find_packages\n\nsetup(\n\tname='hpbandster',\n\tversion='0.7.4',\n\tdescription='HyPerBAND on STERoids, a distributed Hyperband implementation with lots of room for improvement',\n\tauthor='Stefan Falkner',\n\tauthor_email='sfalkner@cs.uni-freiburg.de',\n\turl=\"https://github.com/automl/HpBandSter\",\n\tlicense='BSD 3-Clause License',\n\tclassifiers=['Development Status :: 4 - Beta'],\n\tpackages=find_packages(),\n\tpython_requires='>=3',\n\tinstall_requires=['Pyro4', 'serpent', 'ConfigSpace', 'numpy','statsmodels', 'scipy', 'netifaces'],\n\textras_require = {\n\t\t'docu': ['sphinx', 'sphinx_rtd_theme', 'sphinx_gallery'],\n\t},\n\tkeywords=['distributed', 'optimization', 'multifidelity'],\n    \ttest_suite=\"tests\"\n)"},{"path":"build/lib/hpbandster/examples/example_1_local_sequential.py","chars":3043,"excerpt":"\"\"\"\nExample 1 - Local and Sequential\n================================\n\n\"\"\"\nimport logging\nlogging.basicConfig(level=logging.WARNING)\n\nimport argparse\n\nimport hpbandster.core.nameserver as hpns\nimport hpbandster.core.result as hpres\n\nfrom hpbandster.optimizers import BOHB as BOHB\nfrom hpbandster.examples.commons import MyWorker\n\n\n\nparser = argparse.ArgumentParser(description='Example 1 - sequential and local execution.')\nparser.add_argument('--min_budget',   type=float, help='Minimum budget used during the optimization.',    default=9)\nparser.add_argument('--max_budget',   type=float, help='Maximum budget used during the optimization.',    default=243)\nparser.add_argument('--n_iterations', type=int,   help='Number of iterations performed by the optimizer', default=4)\nargs=parser.parse_args()\n\n\n# Step 1: Start a nameserver\n# Every run needs a nameserver. It could be a 'static' server with a\n# permanent address, but here it will be started for the local machine with the default port.\n# The nameserver manages the concurrent running workers across all possible threads or clusternodes.\n# Note the run_id argument. This uniquely identifies a run of any HpBandSter optimizer.\nNS = hpns.NameServer(run_id='example1', host='127.0.0.1', port=None)\nNS.start()\n\n# Step 2: Start a worker\n# Now we can instantiate a worker, providing the mandatory information\n# Besides the sleep_interval, we need to define the nameserver information and\n# the same run_id as above. After that, we can start the worker in the background,\n# where it will wait for incoming configurations to evaluate.\nw = MyWorker(sleep_interval = 0, nameserver='127.0.0.1',run_id='example1')\nw.run(background=True)\n\n# Step 3: Run an optimizer\n# Now we can create an optimizer object and start the run.\n# Here, we run BOHB, but that is not essential.\n# The run method will return the `Result` that contains all runs performed.\nbohb = BOHB(  configspace = w.get_configspace(),\n              run_id = 'example1', nameserver='127.0.0.1',\n              min_budget=args.min_budget, max_budget=args.max_budget\n           )\nres = bohb.run(n_iterations=args.n_iterations)\n\n# Step 4: Shutdown\n# After the optimizer run, we must shutdown the master and the nameserver.\nbohb.shutdown(shutdown_workers=True)\nNS.shutdown()\n\n# Step 5: Analysis\n# Each optimizer returns a hpbandster.core.result.Result object.\n# It holds informations about the optimization run like the incumbent (=best) configuration.\n# For further details ab\n...[truncated]..."},{"path":"build/lib/hpbandster/examples/example_2_local_parallel_threads.py","chars":3838,"excerpt":"\"\"\"\nExample 2 - Local and Parallel (using threads)\n==============================================\n\nThis example extends example 1 to multiple parallel workers.\nFor demonstrational purposes, the workers are started in separate threads.\nThis is probably not the most common use case but serves as a nice example.\nThe setup can be useful if the workers do their computations outside Python's Global Interpreter Lock, e.g. in some 3rd party extension in C/C++.\nIn that case, all workers can truely work in parallel.\n\n\"\"\"\nimport logging\nlogging.basicConfig(level=logging.WARNING)\n\nimport argparse\n\nimport hpbandster.core.nameserver as hpns\nimport hpbandster.core.result as hpres\n\nfrom hpbandster.optimizers import BOHB as BOHB\nfrom hpbandster.examples.commons import MyWorker\n\n\n\nparser = argparse.ArgumentParser(description='Example 1 - sequential and local execution.')\nparser.add_argument('--min_budget',   type=float, help='Minimum budget used during the optimization.',    default=9)\nparser.add_argument('--max_budget',   type=float, help='Maximum budget used during the optimization.',    default=243)\nparser.add_argument('--n_iterations', type=int,   help='Number of iterations performed by the optimizer', default=4)\nparser.add_argument('--n_workers', type=int,   help='Number of workers to run in parallel.', default=2)\n\nargs=parser.parse_args()\n\n\n# Step 1: Start a nameserver (see example_1)\nNS = hpns.NameServer(run_id='example2', host='127.0.0.1', port=None)\nNS.start()\n\n# Step 2: Start the workers\n# Now we can instantiate the specified number of workers. To emphasize the effect,\n# we introduce a sleep_interval of one second, which makes every function evaluation\n# take a bit of time. Note the additional id argument that helps separating the\n# individual workers. This is necessary because every worker uses its processes\n# ID which is the same for all threads here.\nworkers=[]\nfor i in range(args.n_workers):\n\tw = MyWorker(sleep_interval = 0.5, nameserver='127.0.0.1',run_id='example2', id=i)\n\tw.run(background=True)\n\tworkers.append(w)\n\n# Step 3: Run an optimizer\n# Now we can create an optimizer object and start the run.\n# We add the min_n_workers argument to the run methods to make the optimizer wait\n# for all workers to start. This is not mandatory, and workers can be added\n# at any time, but if the timing of the run is essential, this can be used to\n# synchronize all workers right at the start.\nbohb = BOHB(  configspace = w.get_configspace(),\n...[truncated]..."},{"path":"build/lib/hpbandster/examples/example_3_local_parallel_processes.py","chars":3038,"excerpt":"\"\"\"\nExample 3 - Local and Parallel (using processes)\n================================================\n\nGetting closer to a distributed setup, this examples shows how to connect a nameserver, an optimizer and several workers running in different processes.\nThis would also allow true parallelism if the workers do all the computation in Python, such that the thread based paralelization of example 2 would not work.\n\n\"\"\"\nimport logging\nlogging.basicConfig(level=logging.INFO)\n\nimport argparse\n\nimport hpbandster.core.nameserver as hpns\nimport hpbandster.core.result as hpres\n\nfrom hpbandster.optimizers import BOHB as BOHB\nfrom hpbandster.examples.commons import MyWorker\n\n\n\nparser = argparse.ArgumentParser(description='Example 3 - Local and Parallel Execution.')\nparser.add_argument('--min_budget',   type=float, help='Minimum budget used during the optimization.',    default=9)\nparser.add_argument('--max_budget',   type=float, help='Maximum budget used during the optimization.',    default=243)\nparser.add_argument('--n_iterations', type=int,   help='Number of iterations performed by the optimizer', default=4)\nparser.add_argument('--n_workers', type=int,   help='Number of workers to run in parallel.', default=2)\nparser.add_argument('--worker', help='Flag to turn this into a worker process', action='store_true')\n\nargs=parser.parse_args()\n\n\n\nif args.worker:\n\tw = MyWorker(sleep_interval = 0.5, nameserver='127.0.0.1',run_id='example3')\n\tw.run(background=False)\n\texit(0)\n\n# Start a nameserver (see example_1)\nNS = hpns.NameServer(run_id='example3', host='127.0.0.1', port=None)\nNS.start()\n\n\n# Run an optimizer (see example_2)\nbohb = BOHB(  configspace = MyWorker.get_configspace(),\n\t\t\t  run_id = 'example3',\n\t\t\t  min_budget=args.min_budget, max_budget=args.max_budget\n\t\t   )\nres = bohb.run(n_iterations=args.n_iterations, min_n_workers=args.n_workers)\n\n# Step 4: Shutdown\n# After the optimizer run, we must shutdown the master and the nameserver.\nbohb.shutdown(shutdown_workers=True)\nNS.shutdown()\n\n# Step 5: Analysis\n# Each optimizer returns a hpbandster.core.result.Result object.\n# It holds informations about the optimization run like the incumbent (=best) configuration.\n# For further details about the Result object, see its documentation.\n# Here we simply print out the best config and some statistics about the performed runs.\nid2config = res.get_id2config_mapping()\nincumbent = res.get_incumbent_id()\n\nall_runs = res.get_all_runs()\n\nprint('Best found configuratio\n...[truncated]..."},{"path":"build/lib/hpbandster/examples/example_4_cluster.py","chars":4792,"excerpt":"\"\"\"\nExample 4 - on the cluster\n==========================\n\nThis example shows how to run HpBandster in a cluster environment.\nThe actual python code does differ substantially from example 3, except for a\nshared directory that is used to communicate the location of the nameserver to\nevery worker, and the fact that the communication is done over the network instead\nof just the loop back interface.\n\n\nTo actually run it as a batch job, usually a shell script is required.\nThose differer slightly from scheduler to scheduler.\nHere we provide an example script for the Sun Grid Engine (SGE), but adapting that to\nany other scheduler should be easy.\nThe script simply specifies the logging files for output (`-o`) and error `-e`),\nloads a virtual environment, and then executes the master for the first array task\nand a worker otherwise.\nArray jobs execute the same source multiple times and are bundled together into one job,\nwhere each task gets a unique task ID.\nFor SGE those IDs are positive integers and we simply say the first task is the master.\n\n\n.. code-block:: bash\n\n   # submit via qsub -t 1-4 -q test_core.q example_4_cluster_submit_me.sh\n\n   #$ -cwd\n   #$ -o $JOB_ID-$TASK_ID.o\n   #$ -e $JOB_ID-$TASK_ID.e\n\n   # enter the virtual environment\n   source ~sfalkner/virtualenvs/HpBandSter_tests/bin/activate\n\n\n   if [ $SGE_TASK_ID -eq 1]\n      then python3 example_4_cluster.py --run_id $JOB_ID --nic_name eth0 --working_dir .\n   else \n      python3 example_4_cluster.py --run_id $JOB_ID --nic_name eth0  --working_dir . --worker\n   fi\n\nYou can simply copy the above code into a file, say submit_me.sh, and tell SGE to run it via:\n\n.. code-block:: bash\n\n   qsub -t 1-4 -q your_queue_name submit_me.sh\n\n\nNow to the actual python source:\n\"\"\"\nimport logging\nlogging.basicConfig(level=logging.INFO)\n\nimport argparse\nimport pickle\nimport time\n\nimport hpbandster.core.nameserver as hpns\nimport hpbandster.core.result as hpres\n\nfrom hpbandster.optimizers import BOHB as BOHB\nfrom hpbandster.examples.commons import MyWorker\n\n\n\nparser = argparse.ArgumentParser(description='Example 1 - sequential and local execution.')\nparser.add_argument('--min_budget',   type=float, help='Minimum budget used during the optimization.',    default=9)\nparser.add_argument('--max_budget',   type=float, help='Maximum budget used during the optimization.',    default=243)\nparser.add_argument('--n_iterations', type=int,   help='Number of iterations performed by the optimizer', default=4)\nparser.a\n...[truncated]..."},{"path":"build/lib/hpbandster/examples/example_5_keras_worker.py","chars":9843,"excerpt":"\"\"\"\nWorker for Example 5 - Keras\n============================\n\nIn this example implements a small CNN in Keras to train it on MNIST.\nThe configuration space shows the most common types of hyperparameters and\neven contains conditional dependencies.\n\nWe'll optimise the following hyperparameters:\n\n+-------------------------+----------------+-----------------+------------------------+\n| Parameter Name          | Parameter type |  Range/Choices  | Comment                |\n+=========================+================+=================+========================+\n| Learning rate           |  float         | [1e-6, 1e-2]    | varied logarithmically |\n+-------------------------+----------------+-----------------+------------------------+\n| Optimizer               | categorical    | {Adam, SGD }    | discrete choice        |\n+-------------------------+----------------+-----------------+------------------------+\n| SGD momentum            |  float         | [0, 0.99]       | only active if         |\n|                         |                |                 | optimizer == SGD       |\n+-------------------------+----------------+-----------------+------------------------+\n| Number of conv layers   | integer        | [1,3]           | can only take integer  |\n|                         |                |                 | values 1, 2, or 3      |\n+-------------------------+----------------+-----------------+------------------------+\n| Number of filters in    | integer        | [4, 64]         | logarithmically varied |\n| the first conf layer    |                |                 | integer values         |\n+-------------------------+----------------+-----------------+------------------------+\n| Number of filters in    | integer        | [4, 64]         | only active if number  |\n| the second conf layer   |                |                 | of layers >= 2         |\n+-------------------------+----------------+-----------------+------------------------+\n| Number of filters in    | integer        | [4, 64]         | only active if number  |\n| the third conf layer    |                |                 | of layers == 3         |\n+-------------------------+----------------+-----------------+------------------------+\n| Dropout rate            |  float         | [0, 0.9]        | standard continuous    |\n|                         |                |                 | parameter              |\n+-------------------------+----------------+-----------------+----------\n...[truncated]..."}],"exploration_notes":["Start from README, then file_tree_deep, then source_excerpts.","execution_surface=script; use matching evidence lists for phases.","Prefer compact axes + a few example matrix rows (run_command/code_refs/verify).","Do not invent files or CLI IDs outside this exploration.","Some source excerpts were truncated to fit the Planner context budget."]},"paper_context":{"paper_id":"hbo_baseline","title":"hbo_baseline","pdf_path":"/Users/school/ResearchAssistant/data/papers/hbo_baseline/paper.pdf","arxiv_id":null},"flags":{"has_research_question":true,"has_methodology":true,"has_code_repo":true,"has_datasets":true,"paper_type":"methods"},"results_contract":{"results_root":"results/hbo_baseline","summary_path":"results/hbo_baseline/summary.json","run_dir_pattern":"YYYY-MM-DD_HH-MM-SS__{benchmark_slug}__{method_slug}__seed-{seed}","metrics_filename":"metrics.csv","logs_filename":"logs.txt"},"phase_scaffold":[{"phase_id":"setup","title":"Environment setup","goal":"Install repository dependencies and confirm entrypoints from README.","depends_on":[],"variables":[],"axes":{},"run_template":"python -m venv --clear .venv && .venv/bin/pip install -U pip && .venv/bin/pip install . matplotlib pandas scipy scikit-learn","matrix":[],"planned_actions":"Install dependencies from README/requirements, confirm script entrypoints exist, and note in-file tunables (dataset/method) before running experiments.","results_path":"results/hbo_baseline"},{"phase_id":"smoke","title":"Script smoke run","goal":"Run one README/script entrypoint to validate install and outputs.","depends_on":["setup"],"variables":["script"],"axes":{"script":["build/lib/hpbandster/examples/example_1_local_sequential.py"]},"run_template":"python {script}","matrix":[{"name":"smoke__example_1_local_sequential","variables":{"script":"build/lib/hpbandster/examples/example_1_local_sequential.py"},"run_command":"python build/lib/hpbandster/examples/example_1_local_sequential.py","code_refs":["build/lib/hpbandster/examples/example_1_local_sequential.py","README.md","build/lib/hpbandster/examples/example_2_local_parallel_threads.py"],"verify":["exit_code:0","exists:results/hbo_baseline/smoke"],"results_path":"results/hbo_baseline/smoke","metrics":["Test accuracy / validation loss reduction speed","Validation loss (intermediate losses)"],"source":"repo"}],"planned_actions":"Execute `python build/lib/hpbandster/examples/example_1_local_sequential.py` once; confirm it starts and writes logs.","results_path":"results/hbo_baseline/smoke"},{"phase_id":"experiments","title":"Script experiments","goal":"Run grounded script entrypoints (or scraped dataset×method grid) serially.","depends_on":["smoke"],"variables":["script"],"axes":{"script":["build/lib/hpbandster/examples/example_1_local_sequential.py","build/lib/hpbandster/examples/example_2_local_parallel_threads.py","build/lib/hpbandster/examples/example_3_local_parallel_processes.py","build/lib/hpbandster/examples/example_4_cluster.py","build/lib/hpbandster/examples/example_5_keras_worker.py","build/lib/hpbandster/examples/example_5_mnist.py"]},"run_template":"python {script}","matrix":[{"name":"exp__example_1_local_sequential","variables":{"script":"build/lib/hpbandster/examples/example_1_local_sequential.py"},"run_command":"python build/lib/hpbandster/examples/example_1_local_sequential.py","code_refs":["build/lib/hpbandster/examples/example_1_local_sequential.py","README.md","build/lib/hpbandster/examples/example_2_local_parallel_threads.py"],"verify":["exit_code:0","exists:results/hbo_baseline/experiments/example_1_local_sequential"],"results_path":"results/hbo_baseline/experiments/example_1_local_sequential","metrics":["Test accuracy / validation loss reduction speed","Validation loss (intermediate losses)","Test error rate across multiple trials"],"source":"repo"},{"name":"exp__example_2_local_parallel_threads","variables":{"script":"build/lib/hpbandster/examples/example_2_local_parallel_threads.py"},"run_command":"python build/lib/hpbandster/examples/example_2_local_parallel_threads.py","code_refs":["build/lib/hpbandster/examples/example_2_local_parallel_threads.py","README.md","build/lib/hpbandster/examples/example_1_local_sequential.py"],"verify":["exit_code:0","exists:results/hbo_baseline/experiments/example_2_local_parallel_threads"],"results_path":"results/hbo_baseline/experiments/example_2_local_parallel_threads","metrics":["Test accuracy / validation loss reduction speed","Validation loss (intermediate losses)","Test error rate across multiple trials"],"source":"repo"},{"name":"exp__example_3_local_parallel_processes","variables":{"script":"build/lib/hpbandster/examples/example_3_local_parallel_processes.py"},"run_command":"python build/lib/hpbandster/examples/example_3_local_parallel_processes.py","code_refs":["build/lib/hpbandster/examples/example_3_local_parallel_processes.py","README.md","build/lib/hpbandster/examples/example_1_local_sequential.py","build/lib/hpbandster/examples/example_2_local_parallel_threads.py"],"verify":["exit_code:0","exists:results/hbo_baseline/experiments/example_3_local_parallel_processes"],"results_path":"results/hbo_baseline/experiments/example_3_local_parallel_processes","metrics":["Test accuracy / validation loss reduction speed","Validation loss (intermediate losses)","Test error rate across multiple trials"],"source":"repo"},{"name":"exp__example_4_cluster","variables":{"script":"build/lib/hpbandster/examples/example_4_cluster.py"},"run_command":"python build/lib/hpbandster/examples/example_4_cluster.py","code_refs":["build/lib/hpbandster/examples/example_4_cluster.py","README.md","build/lib/hpbandster/examples/example_1_local_sequential.py","build/lib/hpbandster/examples/example_2_local_parallel_threads.py"],"verify":["exit_code:0","exists:results/hbo_baseline/experiments/example_4_cluster"],"results_path":"results/hbo_baseline/experiments/example_4_cluster","metrics":["Test accuracy / validation loss reduction speed","Validation loss (intermediate losses)","Test error rate across multiple trials"],"source":"repo"},{"name":"exp__example_5_keras_worker","variables":{"script":"build/lib/hpbandster/examples/example_5_keras_worker.py"},"run_command":"python build/lib/hpbandster/examples/example_5_keras_worker.py","code_refs":["build/lib/hpbandster/examples/example_5_keras_worker.py","README.md","build/lib/hpbandster/examples/example_1_local_sequential.py","build/lib/hpbandster/examples/example_2_local_parallel_threads.py"],"verify":["exit_code:0","exists:results/hbo_baseline/experiments/example_5_keras_worker"],"results_path":"results/hbo_baseline/experiments/example_5_keras_worker","metrics":["Test accuracy / validation loss reduction speed","Validation loss (intermediate losses)","Test error rate across multiple trials"],"source":"repo"},{"name":"exp__example_5_mnist","variables":{"script":"build/lib/hpbandster/examples/example_5_mnist.py"},"run_command":"python build/lib/hpbandster/examples/example_5_mnist.py","code_refs":["build/lib/hpbandster/examples/example_5_mnist.py","README.md","build/lib/hpbandster/examples/example_1_local_sequential.py","build/lib/hpbandster/examples/example_2_local_parallel_threads.py"],"verify":["exit_code:0","exists:results/hbo_baseline/experiments/example_5_mnist"],"results_path":"results/hbo_baseline/experiments/example_5_mnist","metrics":["Test accuracy / validation loss reduction speed","Validation loss (intermediate losses)","Test error rate across multiple trials"],"source":"repo"}],"planned_actions":"Edit in-file tunables when axes come from script scrape; do not invent CLI flags. Record dataset availability gaps in missing_context.","results_path":"results/hbo_baseline/experiments"},{"phase_id":"summarize","title":"Aggregate results","goal":"Write/update summary.json aggregates from phase logs.","depends_on":["experiments"],"variables":[],"axes":{},"run_template":"","matrix":[],"planned_actions":"Collect metrics under results/hbo_baseline into results/hbo_baseline/summary.json; do not invent measured values.","results_path":"results/hbo_baseline/summary.json"}]}
+        END_CONTEXT
+
+        Do not summarize the context. Return the Planner envelope now.
+        Required top-level skeleton:
+        {"schema_version":"2.0","agent":"planner","status":"ok|partial|blocked","unknowns":[],"warnings":[],"payload":{"plan_summary":"","domain":"","objective":"","phases":[],"assumptions":[],"constraints":[],"missing_context":[],"verification_checks":[],"risks":[],"organization":[],"execution":[],"repo_usage":[],"engineer_notes":[],"results_summary_path":""}}
+
+Your previous response did not match the Planner schema. Return only a Planner envelope with top-level keys schema_version, agent, status, unknowns, warnings, and payload. Do not summarize or reformat the input. Validation failure: Unterminated string starting at: line 1 column 8207 (char 8206). Your returned top-level keys were []. Required skeleton: {"schema_version":"2.0","agent":"planner","status":"ok|partial|blocked","unknowns":[],"warnings":[],"payload":{"plan_summary":"","domain":"","objective":"","phases":[],"assumptions":[],"constraints":[],"missing_context":[],"verification_checks":[],"risks":[],"organization":[],"execution":[],"repo_usage":[],"engineer_notes":[],"results_summary_path":""}}
+```
+
+#### Raw model response
+```text
+{"schema_version":"2.0","agent":"planner","status":"ok","payload":{"plan_summary":"Execute setup, smoke test with example_1_local_sequential.py, then run all 6 script examples serially to collect metrics (test accuracy/loss), finally aggregate into summary.json.","domain":"hyperband_optimization_baselines","objective":"Validate installation and benchmark sequential vs parallel execution strategies on MNIST/CIFAR-10 using provided scripts.","phases":[{"phase_id":"setup","title":"Environment setup","goal":"Install repository dependencies and confirm entrypoints from README.","depends_on":[],"variables":[],"axes":{},"run_template":"python -m venv --clear .venv && .venv/bin/pip install -U pip && .venv/bin/pip install . matplotlib pandas scipy scikit-learn"},{"phase_id":"smoke","title":"Script smoke run","goal":"Run one README/script entrypoint to validate install and outputs.","depends_on":["setup"],"variables":["script"],"axes":{"script":["build/lib/hpbandster/examples/example_1_local_sequential.py"]},"run_template":"python {script}","matrix":[{"name":"smoke__example_1_local_sequential","variables":{"script":"build/lib/hpbandster/examples/example_1_local_sequential.py"},"run_command":"python build/lib/hpbandster/examples/example_1_local_sequential.py","code_refs":["build/lib/hpbandster/examples/example_1_local_sequential.py","README.md"],"verify":["exit_code:0","exists:results/hbo_baseline/smoke"],"results_path":"results/hbo_baseline/smoke"}]},{"phase_id":"experiments","title":"Script experiments","goal":"Run grounded script entrypoints (or scraped dataset×method grid) serially.","depends_on":["smoke"],"variables":["script"],"axes":{"script":["build/lib/hpbandster/examples/example_1_local_sequential.py","build/lib/hpbandster/examples/example_2_local_parallel_threads.py","build/lib/hpbandster/examples/example_3_local_parallel_processes.py","build/lib/hpbandster/examples/example_4_cluster.py","build/lib/hpbandster/examples/example_5_keras_worker.py","build/lib/hpbandster/examples/example_5_mnist.py"]},"run_template":"python {script}","matrix":[{"name":"exp__example_1_local_sequential","variables":{"script":"build/lib/hpbandster/examples/example_1_local_sequential.py"},"run_command":"python build/lib/hpbandster/examples/example_1_local_sequential.py","code_refs":["build/lib/hpbandster/examples/example_1_local_sequential.py"],"verify":["exit_code:0","exists:results/hbo_baseline/experiments/example_1_local_sequential"],"results_path":"results/hbo_baseline/experiments/example_1_local_sequential"},{"name":"exp__example_2_local_parallel_threads","variables":{"script":"build/lib/hpbandster/examples/example_2_local_parallel_threads.py"},"run_command":"python build/lib/hpbandster/examples/example_2_local_parallel_threads.py","code_refs":["build/lib/hpbandster/examples/example_2_local_parallel_threads.py"],"verify":["exit_code:0","exists:results/hbo_baseline/experiments/example_2_local_parallel_threads"],"results_path":"results/hbo_baseline/experiments/example_2_local_parallel_threads"},{"name":"exp__example_3_local_parallel_processes","variables":{"script":"build/lib/hpbandster/examples/example_3_local_parallel_processes.py"},"run_command":"python build/lib/hpbandster/examples/example_3_local_parallel_processes.py","code_refs":["build/lib/hpbandster/examples/example_3_local_parallel_processes.py"],"verify":["exit_code:0","exists:results/hbo_baseline/experiments/example_3_local_parallel_processes"],"results_path":"results/hbo_baseline/experiments/example_3_local_parallel_processes"},{"name":"exp__example_4_cluster","variables":{"script":"build/lib/hpbandster/examples/example_4_cluster.py"},"run_command":"python build/lib/hpbandster/examples/example_4_cluster.py","code_refs":["build/lib/hpbandster/examples/example_4_cluster.py"],"verify":["exit_code:0","exists:results/hbo_baseline/experiments/example_4_cluster"],"results_path":"results/hbo_baseline/experiments/example_4_cluster"},{"name":"exp__example_5_keras_worker","variables":{"script":"build/lib/hpbandster/examples/example_5_keras_worker.py"},"run_command":"python build/lib/hpbandster/examples/example_5_keras_worker.py","code_refs":["build/lib/hpbandster/examples/example_5_keras_worker.py"],"verify":["exit_code:0","exists:results/hbo_baseline/experiments/example_5_keras_worker"],"results_path":"results/hbo_baseline/experiments/example_5_keras_worker"},{"name":"exp__example_5_mnist","variables":{"script":"build/lib/hpbandster/examples/example_5_mnist.py"},"run_command":"python build/lib/hpbandster/examples/example_5_mnist.py","code_refs":["build/lib/hpbandster/examples/example_5_mnist.py"],"verify":["exit_code:0","exists:results/hbo_baseline/experiments/example_5_mnist"],"results_path":"results/hbo_baseline/experiments/example_5_mnist"}]},{"phase_id":"summarize","title":"Aggregate results","goal":"Write/update summary.json aggregates from phase logs.","depends_on":["experiments"],"variables":[],"axes":{},"run_template":"","matrix":[]}],"assumptions":["Scripts are self-contained and do not require external CLI flags beyond python invocation.","Metrics will be extracted automatically by the scripts into standard locations under results/hbo_baseline/."],"constraints":["Do not invent files or CLI IDs outside this exploration.","Use only provided source excerpts for evidence lists.","Prefer compact axes + a few example matrix rows (run_command/code_refs/verify)."],"missing_context":[],"verification_checks":["exit_code:0","exists:results/hbo_baseline/smoke","exists:results/hbo_baseline/experiments/*"],"risks":["Scripts may fail if datasets are not present; handle missing context gracefully.","Cluster execution scripts require specific environment variables that might be absent."],"organization":["Sequential phases with hard dependencies (setup -> smoke -> experiments -> summarize)."],"execution":[],"repo_usage":["build/lib/hpbandster/examples/example_1_local_sequential.py","build/lib/hpbandster/examples/example_2_local_parallel_threads.py","build/lib/hpbandster/examples/example_3_local_parallel_processes.py","build/lib/hpbandster/examples/example_4_cluster.py","build/lib/hpbandster/examples/example_5_keras_worker.py","build/lib/hpbandster/examples/example_5_mnist.py"],"engineer_notes":["Ensure .venv is activated before running any python command.","Check README.md for specific dataset paths if not auto-detected."],"results_summary_path":"results/hbo_baseline/summary.json"}}
+```
+
+#### Parsed JSON
+```json
+{
+  "schema_version": "2.0",
+  "agent": "planner",
+  "status": "ok",
+  "payload": {
+    "plan_summary": "Execute setup, smoke test with example_1_local_sequential.py, then run all 6 script examples serially to collect metrics (test accuracy/loss), finally aggregate into summary.json.",
+    "domain": "hyperband_optimization_baselines",
+    "objective": "Validate installation and benchmark sequential vs parallel execution strategies on MNIST/CIFAR-10 using provided scripts.",
+    "phases": [
+      {
+        "phase_id": "setup",
+        "title": "Environment setup",
+        "goal": "Install repository dependencies and confirm entrypoints from README.",
+        "depends_on": [],
+        "variables": [],
+        "axes": {},
+        "run_template": "pip install . matplotlib pandas scipy scikit-learn",
+        "matrix": [],
+        "planned_actions": "",
+        "results_path": ""
+      },
+      {
+        "phase_id": "smoke",
+        "title": "Script smoke run",
+        "goal": "Run one README/script entrypoint to validate install and outputs.",
+        "depends_on": [
+          "setup"
+        ],
+        "variables": [
+          "script"
+        ],
+        "axes": {
+          "script": [
+            "build/lib/hpbandster/examples/example_1_local_sequential.py"
+          ]
+        },
+        "run_template": "python {script}",
+        "matrix": [
+          {
+            "name": "smoke__example_1_local_sequential",
+            "variables": {
+              "script": "build/lib/hpbandster/examples/example_1_local_sequential.py"
+            },
+            "run_command": "python build/lib/hpbandster/examples/example_1_local_sequential.py",
+            "code_refs": [
+              "build/lib/hpbandster/examples/example_1_local_sequential.py",
+              "README.md"
+            ],
+            "verify": [
+              "exit_code:0",
+              "exists:results/hbo_baseline/smoke"
+            ],
+            "results_path": "results/hbo_baseline/smoke",
+            "metrics": [],
+            "source": ""
+          }
+        ],
+        "planned_actions": "",
+        "results_path": ""
+      },
+      {
+        "phase_id": "experiments",
+        "title": "Script experiments",
+        "goal": "Run grounded script entrypoints (or scraped dataset\u00d7method grid) serially.",
+        "depends_on": [
+          "smoke"
+        ],
+        "variables": [
+          "script"
+        ],
+        "axes": {
+          "script": [
+            "build/lib/hpbandster/examples/example_1_local_sequential.py",
+            "build/lib/hpbandster/examples/example_2_local_parallel_threads.py",
+            "build/lib/hpbandster/examples/example_3_local_parallel_processes.py",
+            "build/lib/hpbandster/examples/example_4_cluster.py",
+            "build/lib/hpbandster/examples/example_5_keras_worker.py",
+            "build/lib/hpbandster/examples/example_5_mnist.py"
+          ]
+        },
+        "run_template": "python {script}",
+        "matrix": [
+          {
+            "name": "exp__example_1_local_sequential",
+            "variables": {
+              "script": "build/lib/hpbandster/examples/example_1_local_sequential.py"
+            },
+            "run_command": "python build/lib/hpbandster/examples/example_1_local_sequential.py",
+            "code_refs": [
+              "build/lib/hpbandster/examples/example_1_local_sequential.py"
+            ],
+            "verify": [
+              "exit_code:0",
+              "exists:results/hbo_baseline/experiments/example_1_local_sequential"
+            ],
+            "results_path": "results/hbo_baseline/experiments/example_1_local_sequential",
+            "metrics": [],
+            "source": ""
+          },
+          {
+            "name": "exp__example_2_local_parallel_threads",
+            "variables": {
+              "script": "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+            },
+            "run_command": "python build/lib/hpbandster/examples/example_2_local_parallel_threads.py",
+            "code_refs": [
+              "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+            ],
+            "verify": [
+              "exit_code:0",
+              "exists:results/hbo_baseline/experiments/example_2_local_parallel_threads"
+            ],
+            "results_path": "results/hbo_baseline/experiments/example_2_local_parallel_threads",
+            "metrics": [],
+            "source": ""
+          },
+          {
+            "name": "exp__example_3_local_parallel_processes",
+            "variables": {
+              "script": "build/lib/hpbandster/examples/example_3_local_parallel_processes.py"
+            },
+            "run_command": "python build/lib/hpbandster/examples/example_3_local_parallel_processes.py",
+            "code_refs": [
+              "build/lib/hpbandster/examples/example_3_local_parallel_processes.py"
+            ],
+            "verify": [
+              "exit_code:0",
+              "exists:results/hbo_baseline/experiments/example_3_local_parallel_processes"
+            ],
+            "results_path": "results/hbo_baseline/experiments/example_3_local_parallel_processes",
+            "metrics": [],
+            "source": ""
+          },
+          {
+            "name": "exp__example_4_cluster",
+            "variables": {
+              "script": "build/lib/hpbandster/examples/example_4_cluster.py"
+            },
+            "run_command": "python build/lib/hpbandster/examples/example_4_cluster.py",
+            "code_refs": [
+              "build/lib/hpbandster/examples/example_4_cluster.py"
+            ],
+            "verify": [
+              "exit_code:0",
+              "exists:results/hbo_baseline/experiments/example_4_cluster"
+            ],
+            "results_path": "results/hbo_baseline/experiments/example_4_cluster",
+            "metrics": [],
+            "source": ""
+          },
+          {
+            "name": "exp__example_5_keras_worker",
+            "variables": {
+              "script": "build/lib/hpbandster/examples/example_5_keras_worker.py"
+            },
+            "run_command": "python build/lib/hpbandster/examples/example_5_keras_worker.py",
+            "code_refs": [
+              "build/lib/hpbandster/examples/example_5_keras_worker.py"
+            ],
+            "verify": [
+              "exit_code:0",
+              "exists:results/hbo_baseline/experiments/example_5_keras_worker"
+            ],
+            "results_path": "results/hbo_baseline/experiments/example_5_keras_worker",
+            "metrics": [],
+            "source": ""
+          },
+          {
+            "name": "exp__example_5_mnist",
+            "variables": {
+              "script": "build/lib/hpbandster/examples/example_5_mnist.py"
+            },
+            "run_command": "python build/lib/hpbandster/examples/example_5_mnist.py",
+            "code_refs": [
+              "build/lib/hpbandster/examples/example_5_mnist.py"
+            ],
+            "verify": [
+              "exit_code:0",
+              "exists:results/hbo_baseline/experiments/example_5_mnist"
+            ],
+            "results_path": "results/hbo_baseline/experiments/example_5_mnist",
+            "metrics": [],
+            "source": ""
+          }
+        ],
+        "planned_actions": "",
+        "results_path": ""
+      },
+      {
+        "phase_id": "summarize",
+        "title": "Aggregate results",
+        "goal": "Write/update summary.json aggregates from phase logs.",
+        "depends_on": [
+          "experiments"
+        ],
+        "variables": [],
+        "axes": {},
+        "run_template": "",
+        "matrix": [],
+        "planned_actions": "",
+        "results_path": ""
+      }
+    ],
+    "assumptions": [
+      "Scripts are self-contained and do not require external CLI flags beyond python invocation.",
+      "Metrics will be extracted automatically by the scripts into standard locations under results/hbo_baseline/."
+    ],
+    "constraints": [
+      "Do not invent files or CLI IDs outside this exploration.",
+      "Use only provided source excerpts for evidence lists.",
+      "Prefer compact axes + a few example matrix rows (run_command/code_refs/verify)."
+    ],
+    "missing_context": [
+      "setup phase rewritten to avoid venv-in-plan pattern; uses bare pip/python. Engineer creates a workspace-mounted .venv at runtime so installs persist across Docker containers."
+    ],
+    "verification_checks": [
+      "exit_code:0",
+      "exists:results/hbo_baseline/smoke",
+      "exists:results/hbo_baseline/experiments/*"
+    ],
+    "risks": [
+      "Scripts may fail if datasets are not present; handle missing context gracefully.",
+      "Cluster execution scripts require specific environment variables that might be absent."
+    ],
+    "organization": [
+      "Sequential phases with hard dependencies (setup -> smoke -> experiments -> summarize)."
+    ],
+    "execution": [],
+    "repo_usage": [
+      "build/lib/hpbandster/examples/example_1_local_sequential.py",
+      "build/lib/hpbandster/examples/example_2_local_parallel_threads.py",
+      "build/lib/hpbandster/examples/example_3_local_parallel_processes.py",
+      "build/lib/hpbandster/examples/example_4_cluster.py",
+      "build/lib/hpbandster/examples/example_5_keras_worker.py",
+      "build/lib/hpbandster/examples/example_5_mnist.py"
+    ],
+    "engineer_notes": [
+      "Ensure .venv is activated before running any python command.",
+      "Check README.md for specific dataset paths if not auto-detected."
+    ],
+    "results_summary_path": "results/hbo_baseline/summary.json"
+  },
+  "warnings": [
+    "setup phase contained python -m venv / .venv/bin patterns; rewritten to bare pip/python"
+  ]
+}
+```
+
+## Final accepted planner output
+```json
+{
+  "schema_version": "2.0",
+  "agent": "planner",
+  "status": "ok",
+  "unknowns": [],
+  "warnings": [
+    "setup phase contained python -m venv / .venv/bin patterns; rewritten to bare pip/python",
+    "phases rebuilt deterministically from execution_surface scaffolds and Analyst lists.",
+    "execution_surface=script",
+    "plan verification kept 7 matrix row(s); none demoted.",
+    "results_summary_path feasibility unchecked or undocumented for results/hbo_baseline/summary.json"
+  ],
+  "payload": {
+    "plan_summary": "Execute setup, smoke test with example_1_local_sequential.py, then run all 6 script examples serially to collect metrics (test accuracy/loss), finally aggregate into summary.json.",
+    "domain": "hyperband_optimization_baselines",
+    "objective": "Validate installation and benchmark sequential vs parallel execution strategies on MNIST/CIFAR-10 using provided scripts.",
+    "phases": [
+      {
+        "phase_id": "setup",
+        "title": "Environment setup",
+        "goal": "Install repository dependencies and confirm entrypoints from README.",
+        "depends_on": [],
+        "variables": [],
+        "axes": {},
+        "run_template": "pip install . matplotlib pandas scipy scikit-learn",
+        "matrix": [],
+        "planned_actions": "Install dependencies from README/requirements, confirm script entrypoints exist, and note in-file tunables (dataset/method) before running experiments.",
+        "results_path": "results/hbo_baseline"
+      },
+      {
+        "phase_id": "smoke",
+        "title": "Script smoke run",
+        "goal": "Run one README/script entrypoint to validate install and outputs.",
+        "depends_on": [
+          "setup"
+        ],
+        "variables": [
+          "script"
+        ],
+        "axes": {
+          "script": [
+            "build/lib/hpbandster/examples/example_1_local_sequential.py"
+          ]
+        },
+        "run_template": "python {script}",
+        "matrix": [
+          {
+            "name": "smoke__example_1_local_sequential",
+            "variables": {
+              "script": "build/lib/hpbandster/examples/example_1_local_sequential.py"
+            },
+            "run_command": "python build/lib/hpbandster/examples/example_1_local_sequential.py",
+            "code_refs": [
+              "build/lib/hpbandster/examples/example_1_local_sequential.py",
+              "README.md",
+              "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+            ],
+            "verify": [
+              "exit_code:0",
+              "exists:results/hbo_baseline/smoke"
+            ],
+            "results_path": "results/hbo_baseline/smoke",
+            "metrics": [
+              "Test accuracy / validation loss reduction speed",
+              "Validation loss (intermediate losses)"
+            ],
+            "source": "repo"
+          }
+        ],
+        "planned_actions": "Execute `python build/lib/hpbandster/examples/example_1_local_sequential.py` once; confirm it starts and writes logs.",
+        "results_path": "results/hbo_baseline/smoke"
+      },
+      {
+        "phase_id": "experiments",
+        "title": "Script experiments",
+        "goal": "Run grounded script entrypoints (or scraped dataset\u00d7method grid) serially.",
+        "depends_on": [
+          "smoke"
+        ],
+        "variables": [
+          "script"
+        ],
+        "axes": {
+          "script": [
+            "build/lib/hpbandster/examples/example_1_local_sequential.py",
+            "build/lib/hpbandster/examples/example_2_local_parallel_threads.py",
+            "build/lib/hpbandster/examples/example_3_local_parallel_processes.py",
+            "build/lib/hpbandster/examples/example_4_cluster.py",
+            "build/lib/hpbandster/examples/example_5_keras_worker.py",
+            "build/lib/hpbandster/examples/example_5_mnist.py"
+          ]
+        },
+        "run_template": "python {script}",
+        "matrix": [
+          {
+            "name": "exp__example_1_local_sequential",
+            "variables": {
+              "script": "build/lib/hpbandster/examples/example_1_local_sequential.py"
+            },
+            "run_command": "python build/lib/hpbandster/examples/example_1_local_sequential.py",
+            "code_refs": [
+              "build/lib/hpbandster/examples/example_1_local_sequential.py",
+              "README.md",
+              "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+            ],
+            "verify": [
+              "exit_code:0",
+              "exists:results/hbo_baseline/experiments/example_1_local_sequential"
+            ],
+            "results_path": "results/hbo_baseline/experiments/example_1_local_sequential",
+            "metrics": [
+              "Test accuracy / validation loss reduction speed",
+              "Validation loss (intermediate losses)",
+              "Test error rate across multiple trials"
+            ],
+            "source": "repo"
+          },
+          {
+            "name": "exp__example_2_local_parallel_threads",
+            "variables": {
+              "script": "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+            },
+            "run_command": "python build/lib/hpbandster/examples/example_2_local_parallel_threads.py",
+            "code_refs": [
+              "build/lib/hpbandster/examples/example_2_local_parallel_threads.py",
+              "README.md",
+              "build/lib/hpbandster/examples/example_1_local_sequential.py"
+            ],
+            "verify": [
+              "exit_code:0",
+              "exists:results/hbo_baseline/experiments/example_2_local_parallel_threads"
+            ],
+            "results_path": "results/hbo_baseline/experiments/example_2_local_parallel_threads",
+            "metrics": [
+              "Test accuracy / validation loss reduction speed",
+              "Validation loss (intermediate losses)",
+              "Test error rate across multiple trials"
+            ],
+            "source": "repo"
+          },
+          {
+            "name": "exp__example_3_local_parallel_processes",
+            "variables": {
+              "script": "build/lib/hpbandster/examples/example_3_local_parallel_processes.py"
+            },
+            "run_command": "python build/lib/hpbandster/examples/example_3_local_parallel_processes.py",
+            "code_refs": [
+              "build/lib/hpbandster/examples/example_3_local_parallel_processes.py",
+              "README.md",
+              "build/lib/hpbandster/examples/example_1_local_sequential.py",
+              "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+            ],
+            "verify": [
+              "exit_code:0",
+              "exists:results/hbo_baseline/experiments/example_3_local_parallel_processes"
+            ],
+            "results_path": "results/hbo_baseline/experiments/example_3_local_parallel_processes",
+            "metrics": [
+              "Test accuracy / validation loss reduction speed",
+              "Validation loss (intermediate losses)",
+              "Test error rate across multiple trials"
+            ],
+            "source": "repo"
+          },
+          {
+            "name": "exp__example_4_cluster",
+            "variables": {
+              "script": "build/lib/hpbandster/examples/example_4_cluster.py"
+            },
+            "run_command": "python build/lib/hpbandster/examples/example_4_cluster.py",
+            "code_refs": [
+              "build/lib/hpbandster/examples/example_4_cluster.py",
+              "README.md",
+              "build/lib/hpbandster/examples/example_1_local_sequential.py",
+              "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+            ],
+            "verify": [
+              "exit_code:0",
+              "exists:results/hbo_baseline/experiments/example_4_cluster"
+            ],
+            "results_path": "results/hbo_baseline/experiments/example_4_cluster",
+            "metrics": [
+              "Test accuracy / validation loss reduction speed",
+              "Validation loss (intermediate losses)",
+              "Test error rate across multiple trials"
+            ],
+            "source": "repo"
+          },
+          {
+            "name": "exp__example_5_keras_worker",
+            "variables": {
+              "script": "build/lib/hpbandster/examples/example_5_keras_worker.py"
+            },
+            "run_command": "python build/lib/hpbandster/examples/example_5_keras_worker.py",
+            "code_refs": [
+              "build/lib/hpbandster/examples/example_5_keras_worker.py",
+              "README.md",
+              "build/lib/hpbandster/examples/example_1_local_sequential.py",
+              "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+            ],
+            "verify": [
+              "exit_code:0",
+              "exists:results/hbo_baseline/experiments/example_5_keras_worker"
+            ],
+            "results_path": "results/hbo_baseline/experiments/example_5_keras_worker",
+            "metrics": [
+              "Test accuracy / validation loss reduction speed",
+              "Validation loss (intermediate losses)",
+              "Test error rate across multiple trials"
+            ],
+            "source": "repo"
+          },
+          {
+            "name": "exp__example_5_mnist",
+            "variables": {
+              "script": "build/lib/hpbandster/examples/example_5_mnist.py"
+            },
+            "run_command": "python build/lib/hpbandster/examples/example_5_mnist.py",
+            "code_refs": [
+              "build/lib/hpbandster/examples/example_5_mnist.py",
+              "README.md",
+              "build/lib/hpbandster/examples/example_1_local_sequential.py",
+              "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+            ],
+            "verify": [
+              "exit_code:0",
+              "exists:results/hbo_baseline/experiments/example_5_mnist"
+            ],
+            "results_path": "results/hbo_baseline/experiments/example_5_mnist",
+            "metrics": [
+              "Test accuracy / validation loss reduction speed",
+              "Validation loss (intermediate losses)",
+              "Test error rate across multiple trials"
+            ],
+            "source": "repo"
+          }
+        ],
+        "planned_actions": "Edit in-file tunables when axes come from script scrape; do not invent CLI flags. Record dataset availability gaps in missing_context.",
+        "results_path": "results/hbo_baseline/experiments"
+      },
+      {
+        "phase_id": "summarize",
+        "title": "Aggregate results",
+        "goal": "Write/update summary.json aggregates from phase logs.",
+        "depends_on": [
+          "experiments"
+        ],
+        "variables": [],
+        "axes": {},
+        "run_template": "",
+        "matrix": [],
+        "planned_actions": "Collect metrics under results/hbo_baseline into results/hbo_baseline/summary.json; do not invent measured values.",
+        "results_path": "results/hbo_baseline/summary.json"
+      }
+    ],
+    "assumptions": [
+      "Scripts are self-contained and do not require external CLI flags beyond python invocation.",
+      "Metrics will be extracted automatically by the scripts into standard locations under results/hbo_baseline/."
+    ],
+    "constraints": [
+      "Do not invent files or CLI IDs outside this exploration.",
+      "Use only provided source excerpts for evidence lists.",
+      "Prefer compact axes + a few example matrix rows (run_command/code_refs/verify)."
+    ],
+    "missing_context": [
+      "setup phase rewritten to avoid venv-in-plan pattern; uses bare pip/python. Engineer creates a workspace-mounted .venv at runtime so installs persist across Docker containers.",
+      "Script tunables (dataset/method) were not scraped; confirm in-file defaults.",
+      "results_summary_path assumes repo creates summary.json; if not, Engineer will report 0 metrics captured unless per-row result artifacts under matrix results_path are readable."
+    ],
+    "verification_checks": [
+      "exit_code:0",
+      "exists:results/hbo_baseline/smoke",
+      "exists:results/hbo_baseline/experiments/*",
+      "exists:results/hbo_baseline/experiments/example_1_local_sequential",
+      "exists:results/hbo_baseline/experiments/example_2_local_parallel_threads",
+      "exists:results/hbo_baseline/experiments/example_3_local_parallel_processes",
+      "exists:results/hbo_baseline/experiments/example_4_cluster",
+      "exists:results/hbo_baseline/experiments/example_5_keras_worker",
+      "exists:results/hbo_baseline/experiments/example_5_mnist",
+      "entrypoint exists for each kept run_command",
+      "CLI flags documented in entrypoint argparse (when flags used)",
+      "manual OrderedDict / # set edits demoted to missing_context"
+    ],
+    "risks": [
+      "Scripts may fail if datasets are not present; handle missing context gracefully.",
+      "Cluster execution scripts require specific environment variables that might be absent.",
+      "In-file OrderedDict edits are required when scripts expose no CLI flags."
+    ],
+    "organization": [
+      "Sequential phases with hard dependencies (setup -> smoke -> experiments -> summarize)."
+    ],
+    "execution": [
+      "Follow phases in depends_on order.",
+      "Example run: python build/lib/hpbandster/examples/example_1_local_sequential.py"
+    ],
+    "repo_usage": [
+      "build/lib/hpbandster/examples/example_1_local_sequential.py",
+      "build/lib/hpbandster/examples/example_2_local_parallel_threads.py",
+      "build/lib/hpbandster/examples/example_3_local_parallel_processes.py",
+      "build/lib/hpbandster/examples/example_4_cluster.py",
+      "build/lib/hpbandster/examples/example_5_keras_worker.py",
+      "build/lib/hpbandster/examples/example_5_mnist.py",
+      "script:setup.py",
+      "script:build/lib/hpbandster/examples/example_1_local_sequential.py",
+      "script:build/lib/hpbandster/examples/example_2_local_parallel_threads.py",
+      "script:build/lib/hpbandster/examples/example_3_local_parallel_processes.py",
+      "script:build/lib/hpbandster/examples/example_4_cluster.py",
+      "script:build/lib/hpbandster/examples/example_5_keras_worker.py",
+      "test:tests/test_kernels.py",
+      "test:tests/test_config_generators.py",
+      "test:tests/test_kde.py",
+      "test:tests/test_result.py",
+      "test:tests/test_utils.py",
+      "test:tests/test_worker.py"
+    ],
+    "engineer_notes": [
+      "Ensure .venv is activated before running any python command.",
+      "Check README.md for specific dataset paths if not auto-detected."
+    ],
+    "results_summary_path": "results/hbo_baseline/summary.json"
+  }
+}
+```
+
+## Comparison to saved plan JSON
+- plan_summary matches saved plan.
+- objective matches saved plan.
+- phases: llm=4 saved=4
+- matrix_rows: llm=7 saved=7
+- ISSUE: analyst datasets mostly absent from plan output (sample missing: ['HPOlib benchmark library', '117 multistage model selection tasks (including deep learning and kernel-based problems)', 'Stochastic Infinite-armed Bandit Setting', 'General Parametric Assumptions (Equations 5 and 6)', 'MRBI'])
+
+### Saved plan JSON (normalized body)
+```json
+{
+  "schema_version": "2.0",
+  "agent": "planner",
+  "status": "ok",
+  "unknowns": [],
+  "warnings": [
+    "setup phase contained python -m venv / .venv/bin patterns; rewritten to bare pip/python",
+    "phases rebuilt deterministically from execution_surface scaffolds and Analyst lists.",
+    "execution_surface=script",
+    "plan verification kept 7 matrix row(s); none demoted.",
+    "results_summary_path feasibility unchecked or undocumented for results/hbo_baseline/summary.json"
+  ],
+  "payload": {
+    "plan_summary": "Execute setup, smoke test with example_1_local_sequential.py, then run all 6 script examples serially to collect metrics (test accuracy/loss), finally aggregate into summary.json.",
+    "domain": "hyperband_optimization_baselines",
+    "objective": "Validate installation and benchmark sequential vs parallel execution strategies on MNIST/CIFAR-10 using provided scripts.",
+    "phases": [
+      {
+        "phase_id": "setup",
+        "title": "Environment setup",
+        "goal": "Install repository dependencies and confirm entrypoints from README.",
+        "depends_on": [],
+        "variables": [],
+        "axes": {},
+        "run_template": "pip install . matplotlib pandas scipy scikit-learn",
+        "matrix": [],
+        "planned_actions": "Install dependencies from README/requirements, confirm script entrypoints exist, and note in-file tunables (dataset/method) before running experiments.",
+        "results_path": "results/hbo_baseline"
+      },
+      {
+        "phase_id": "smoke",
+        "title": "Script smoke run",
+        "goal": "Run one README/script entrypoint to validate install and outputs.",
+        "depends_on": [
+          "setup"
+        ],
+        "variables": [
+          "script"
+        ],
+        "axes": {
+          "script": [
+            "build/lib/hpbandster/examples/example_1_local_sequential.py"
+          ]
+        },
+        "run_template": "python {script}",
+        "matrix": [
+          {
+            "name": "smoke__example_1_local_sequential",
+            "variables": {
+              "script": "build/lib/hpbandster/examples/example_1_local_sequential.py"
+            },
+            "run_command": "python build/lib/hpbandster/examples/example_1_local_sequential.py",
+            "code_refs": [
+              "build/lib/hpbandster/examples/example_1_local_sequential.py",
+              "README.md",
+              "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+            ],
+            "verify": [
+              "exit_code:0",
+              "exists:results/hbo_baseline/smoke"
+            ],
+            "results_path": "results/hbo_baseline/smoke",
+            "metrics": [
+              "Test accuracy / validation loss reduction speed",
+              "Validation loss (intermediate losses)"
+            ],
+            "source": "repo"
+          }
+        ],
+        "planned_actions": "Execute `python build/lib/hpbandster/examples/example_1_local_sequential.py` once; confirm it starts and writes logs.",
+        "results_path": "results/hbo_baseline/smoke"
+      },
+      {
+        "phase_id": "experiments",
+        "title": "Script experiments",
+        "goal": "Run grounded script entrypoints (or scraped dataset\u00d7method grid) serially.",
+        "depends_on": [
+          "smoke"
+        ],
+        "variables": [
+          "script"
+        ],
+        "axes": {
+          "script": [
+            "build/lib/hpbandster/examples/example_1_local_sequential.py",
+            "build/lib/hpbandster/examples/example_2_local_parallel_threads.py",
+            "build/lib/hpbandster/examples/example_3_local_parallel_processes.py",
+            "build/lib/hpbandster/examples/example_4_cluster.py",
+            "build/lib/hpbandster/examples/example_5_keras_worker.py",
+            "build/lib/hpbandster/examples/example_5_mnist.py"
+          ]
+        },
+        "run_template": "python {script}",
+        "matrix": [
+          {
+            "name": "exp__example_1_local_sequential",
+            "variables": {
+              "script": "build/lib/hpbandster/examples/example_1_local_sequential.py"
+            },
+            "run_command": "python build/lib/hpbandster/examples/example_1_local_sequential.py",
+            "code_refs": [
+              "build/lib/hpbandster/examples/example_1_local_sequential.py",
+              "README.md",
+              "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+            ],
+            "verify": [
+              "exit_code:0",
+              "exists:results/hbo_baseline/experiments/example_1_local_sequential"
+            ],
+            "results_path": "results/hbo_baseline/experiments/example_1_local_sequential",
+            "metrics": [
+              "Test accuracy / validation loss reduction speed",
+              "Validation loss (intermediate losses)",
+              "Test error rate across multiple trials"
+            ],
+            "source": "repo"
+          },
+          {
+            "name": "exp__example_2_local_parallel_threads",
+            "variables": {
+              "script": "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+            },
+            "run_command": "python build/lib/hpbandster/examples/example_2_local_parallel_threads.py",
+            "code_refs": [
+              "build/lib/hpbandster/examples/example_2_local_parallel_threads.py",
+              "README.md",
+              "build/lib/hpbandster/examples/example_1_local_sequential.py"
+            ],
+            "verify": [
+              "exit_code:0",
+              "exists:results/hbo_baseline/experiments/example_2_local_parallel_threads"
+            ],
+            "results_path": "results/hbo_baseline/experiments/example_2_local_parallel_threads",
+            "metrics": [
+              "Test accuracy / validation loss reduction speed",
+              "Validation loss (intermediate losses)",
+              "Test error rate across multiple trials"
+            ],
+            "source": "repo"
+          },
+          {
+            "name": "exp__example_3_local_parallel_processes",
+            "variables": {
+              "script": "build/lib/hpbandster/examples/example_3_local_parallel_processes.py"
+            },
+            "run_command": "python build/lib/hpbandster/examples/example_3_local_parallel_processes.py",
+            "code_refs": [
+              "build/lib/hpbandster/examples/example_3_local_parallel_processes.py",
+              "README.md",
+              "build/lib/hpbandster/examples/example_1_local_sequential.py",
+              "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+            ],
+            "verify": [
+              "exit_code:0",
+              "exists:results/hbo_baseline/experiments/example_3_local_parallel_processes"
+            ],
+            "results_path": "results/hbo_baseline/experiments/example_3_local_parallel_processes",
+            "metrics": [
+              "Test accuracy / validation loss reduction speed",
+              "Validation loss (intermediate losses)",
+              "Test error rate across multiple trials"
+            ],
+            "source": "repo"
+          },
+          {
+            "name": "exp__example_4_cluster",
+            "variables": {
+              "script": "build/lib/hpbandster/examples/example_4_cluster.py"
+            },
+            "run_command": "python build/lib/hpbandster/examples/example_4_cluster.py",
+            "code_refs": [
+              "build/lib/hpbandster/examples/example_4_cluster.py",
+              "README.md",
+              "build/lib/hpbandster/examples/example_1_local_sequential.py",
+              "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+            ],
+            "verify": [
+              "exit_code:0",
+              "exists:results/hbo_baseline/experiments/example_4_cluster"
+            ],
+            "results_path": "results/hbo_baseline/experiments/example_4_cluster",
+            "metrics": [
+              "Test accuracy / validation loss reduction speed",
+              "Validation loss (intermediate losses)",
+              "Test error rate across multiple trials"
+            ],
+            "source": "repo"
+          },
+          {
+            "name": "exp__example_5_keras_worker",
+            "variables": {
+              "script": "build/lib/hpbandster/examples/example_5_keras_worker.py"
+            },
+            "run_command": "python build/lib/hpbandster/examples/example_5_keras_worker.py",
+            "code_refs": [
+              "build/lib/hpbandster/examples/example_5_keras_worker.py",
+              "README.md",
+              "build/lib/hpbandster/examples/example_1_local_sequential.py",
+              "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+            ],
+            "verify": [
+              "exit_code:0",
+              "exists:results/hbo_baseline/experiments/example_5_keras_worker"
+            ],
+            "results_path": "results/hbo_baseline/experiments/example_5_keras_worker",
+            "metrics": [
+              "Test accuracy / validation loss reduction speed",
+              "Validation loss (intermediate losses)",
+              "Test error rate across multiple trials"
+            ],
+            "source": "repo"
+          },
+          {
+            "name": "exp__example_5_mnist",
+            "variables": {
+              "script": "build/lib/hpbandster/examples/example_5_mnist.py"
+            },
+            "run_command": "python build/lib/hpbandster/examples/example_5_mnist.py",
+            "code_refs": [
+              "build/lib/hpbandster/examples/example_5_mnist.py",
+              "README.md",
+              "build/lib/hpbandster/examples/example_1_local_sequential.py",
+              "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+            ],
+            "verify": [
+              "exit_code:0",
+              "exists:results/hbo_baseline/experiments/example_5_mnist"
+            ],
+            "results_path": "results/hbo_baseline/experiments/example_5_mnist",
+            "metrics": [
+              "Test accuracy / validation loss reduction speed",
+              "Validation loss (intermediate losses)",
+              "Test error rate across multiple trials"
+            ],
+            "source": "repo"
+          }
+        ],
+        "planned_actions": "Edit in-file tunables when axes come from script scrape; do not invent CLI flags. Record dataset availability gaps in missing_context.",
+        "results_path": "results/hbo_baseline/experiments"
+      },
+      {
+        "phase_id": "summarize",
+        "title": "Aggregate results",
+        "goal": "Write/update summary.json aggregates from phase logs.",
+        "depends_on": [
+          "experiments"
+        ],
+        "variables": [],
+        "axes": {},
+        "run_template": "",
+        "matrix": [],
+        "planned_actions": "Collect metrics under results/hbo_baseline into results/hbo_baseline/summary.json; do not invent measured values.",
+        "results_path": "results/hbo_baseline/summary.json"
+      }
+    ],
+    "assumptions": [
+      "Scripts are self-contained and do not require external CLI flags beyond python invocation.",
+      "Metrics will be extracted automatically by the scripts into standard locations under results/hbo_baseline/."
+    ],
+    "constraints": [
+      "Do not invent files or CLI IDs outside this exploration.",
+      "Use only provided source excerpts for evidence lists.",
+      "Prefer compact axes + a few example matrix rows (run_command/code_refs/verify)."
+    ],
+    "missing_context": [
+      "setup phase rewritten to avoid venv-in-plan pattern; uses bare pip/python. Engineer creates a workspace-mounted .venv at runtime so installs persist across Docker containers.",
+      "Script tunables (dataset/method) were not scraped; confirm in-file defaults.",
+      "results_summary_path assumes repo creates summary.json; if not, Engineer will report 0 metrics captured unless per-row result artifacts under matrix results_path are readable."
+    ],
+    "verification_checks": [
+      "exit_code:0",
+      "exists:results/hbo_baseline/smoke",
+      "exists:results/hbo_baseline/experiments/*",
+      "exists:results/hbo_baseline/experiments/example_1_local_sequential",
+      "exists:results/hbo_baseline/experiments/example_2_local_parallel_threads",
+      "exists:results/hbo_baseline/experiments/example_3_local_parallel_processes",
+      "exists:results/hbo_baseline/experiments/example_4_cluster",
+      "exists:results/hbo_baseline/experiments/example_5_keras_worker",
+      "exists:results/hbo_baseline/experiments/example_5_mnist",
+      "entrypoint exists for each kept run_command",
+      "CLI flags documented in entrypoint argparse (when flags used)",
+      "manual OrderedDict / # set edits demoted to missing_context"
+    ],
+    "risks": [
+      "Scripts may fail if datasets are not present; handle missing context gracefully.",
+      "Cluster execution scripts require specific environment variables that might be absent.",
+      "In-file OrderedDict edits are required when scripts expose no CLI flags."
+    ],
+    "organization": [
+      "Sequential phases with hard dependencies (setup -> smoke -> experiments -> summarize)."
+    ],
+    "execution": [
+      "Follow phases in depends_on order.",
+      "Example run: python build/lib/hpbandster/examples/example_1_local_sequential.py"
+    ],
+    "repo_usage": [
+      "build/lib/hpbandster/examples/example_1_local_sequential.py",
+      "build/lib/hpbandster/examples/example_2_local_parallel_threads.py",
+      "build/lib/hpbandster/examples/example_3_local_parallel_processes.py",
+      "build/lib/hpbandster/examples/example_4_cluster.py",
+      "build/lib/hpbandster/examples/example_5_keras_worker.py",
+      "build/lib/hpbandster/examples/example_5_mnist.py",
+      "script:setup.py",
+      "script:build/lib/hpbandster/examples/example_1_local_sequential.py",
+      "script:build/lib/hpbandster/examples/example_2_local_parallel_threads.py",
+      "script:build/lib/hpbandster/examples/example_3_local_parallel_processes.py",
+      "script:build/lib/hpbandster/examples/example_4_cluster.py",
+      "script:build/lib/hpbandster/examples/example_5_keras_worker.py",
+      "test:tests/test_kernels.py",
+      "test:tests/test_config_generators.py",
+      "test:tests/test_kde.py",
+      "test:tests/test_result.py",
+      "test:tests/test_utils.py",
+      "test:tests/test_worker.py"
+    ],
+    "engineer_notes": [
+      "Ensure .venv is activated before running any python command.",
+      "Check README.md for specific dataset paths if not auto-detected."
+    ],
+    "results_summary_path": "results/hbo_baseline/summary.json"
+  }
+}
+```

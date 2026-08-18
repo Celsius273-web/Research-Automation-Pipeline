@@ -2,22 +2,38 @@
 __pycache__/
 *.pyc
 *.pyo
+.pyo
 .venv/
 venv/
 *.egg-info/
+.pytest_cache/
 
-md/
+# Environment
 .env
 *.env
-/data
-.DS_Store
-*.egg-info/
+secrets*.json
 
-*.sqlite3
-/examples
-.pytest_cache/
+# OS & IDE
+.DS_Store
 .cursor/
 .cursorignore
 .cursor/rules
 .vscode/
 .idea/
+
+# Databases
+*.sqlite3
+
+# Directories
+/examples
+/data/papers/*/runs/R[2-9]*
+data/papers/hbo_baseline/code/
+data/papers/optuna/code/
+
+# Logs
+*.log
+
+# Build
+build/
+dist/
+*.egg-info/

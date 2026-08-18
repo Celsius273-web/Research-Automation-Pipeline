@@ -1,0 +1,54 @@
+{
+  "paper": {
+    "paper_id": "p1",
+    "title": "Paper 1",
+    "pdf_path": "paper.pdf",
+    "arxiv_id": null
+  },
+  "plan_review": {
+    "status": "approved",
+    "notes": "looks good"
+  },
+  "source_extraction_path": "data/extractions/p1.json",
+  "plan_envelope": {
+    "schema_version": "2.0",
+    "agent": "planner",
+    "status": "ok",
+    "unknowns": [],
+    "warnings": [],
+    "payload": {
+      "plan_summary": "Test plan",
+      "domain": "optimization",
+      "objective": "Reproduce results",
+      "phases": [
+        {
+          "phase_id": "s1",
+          "title": "Step one",
+          "kind": "execute",
+          "goal": "",
+          "depends_on": [],
+          "variables": [],
+          "axes": {},
+          "run_template": "",
+          "matrix": [],
+          "planned_actions": "",
+          "results_path": "",
+          "input_paths": [],
+          "required_artifacts": [],
+          "acceptance_commands": [],
+          "specification": {}
+        }
+      ],
+      "assumptions": [],
+      "constraints": [],
+      "missing_context": [],
+      "verification_checks": [],
+      "risks": [],
+      "organization": [],
+      "execution": [],
+      "repo_usage": [],
+      "engineer_notes": [],
+      "results_summary_path": "results/p1/summary.json"
+    }
+  }
+}

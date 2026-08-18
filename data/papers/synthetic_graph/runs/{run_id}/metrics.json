@@ -1,0 +1,16 @@
+{
+  "run_status": "FAILED",
+  "exit_code": 1,
+  "attempts": 1,
+  "timestamp": "2026-08-15T00:43:45.828977Z",
+  "metrics": [],
+  "experiment_matrix": [],
+  "logs_captured": true,
+  "phases_completed": [],
+  "phases_failed": [
+    "engineer_code"
+  ],
+  "errors": [
+    "Failed to generate code after 3 attempts"
+  ]
+}

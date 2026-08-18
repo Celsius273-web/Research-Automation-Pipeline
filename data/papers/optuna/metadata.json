@@ -1,0 +1,14 @@
+{
+  "paper_id": "optuna",
+  "title": "Optuna: A Next-generation Hyperparameter Optimization Framework",
+  "arxiv_id": null,
+  "repo_url": "https://github.com/optuna/optuna.git",
+  "pdf_checksum": "a1ec86ba21a3f2e7bb774c00f8b108dc955993f39feed72f5d8ee3910b6d8a51",
+  "ingested_at": "2026-08-11T12:48:07.289904",
+  "repo_commit_sha": "d02dad591b16ad2993ebfdd1735336d2ba56b00c",
+  "bundle_structure": {
+    "paper.pdf": "Original paper PDF",
+    "code/": "Cloned repository (if repo_url provided)",
+    "metadata.json": "This metadata file"
+  }
+}

@@ -1,0 +1,339 @@
+{
+  "paper": {
+    "paper_id": "optuna",
+    "title": "Optuna: A Next-generation Hyperparameter Optimization Framework",
+    "pdf_path": "/Users/school/ResearchAssistant/data/papers/optuna/paper.pdf",
+    "arxiv_id": null
+  },
+  "plan_review": {
+    "status": "approved",
+    "notes": "Auto-approved (non-interactive mode)."
+  },
+  "source_extraction_path": "/Users/school/ResearchAssistant/data/papers/optuna/optuna.json",
+  "plan_envelope": {
+    "schema_version": "2.0",
+    "agent": "planner",
+    "status": "ok",
+    "unknowns": [],
+    "warnings": [
+      "phases rebuilt deterministically from execution_surface scaffolds and Analyst lists.",
+      "execution_surface=script",
+      "plan verification kept 7 matrix row(s); none demoted.",
+      "results_summary_path feasibility unchecked or undocumented for results/optuna/summary.json",
+      "setup phase contained python -m venv / .venv/bin patterns; rewritten to bare pip/python"
+    ],
+    "payload": {
+      "plan_summary": "Execute a structured exploration of the Optuna repository to validate installation, run smoke tests on experimental modules, and execute serial experiments across identified script entrypoints (samplers, evaluators, optimization studies). Aggregate results into summary.json.",
+      "domain": "Hyperparameter Optimization Framework",
+      "objective": "Validate Optuna's functionality by running provided scripts, confirming exit codes 0, generating logs in the specified directory structure, and capturing metrics regarding validation loss/accuracy or best attained objective values where applicable.",
+      "phases": [
+        {
+          "phase_id": "setup",
+          "title": "Environment setup",
+          "goal": "Install repository dependencies and confirm entrypoints from README.",
+          "depends_on": [],
+          "variables": [],
+          "axes": {},
+          "run_template": "pip install . matplotlib pandas scipy scikit-learn tqdm pyyaml",
+          "matrix": [],
+          "planned_actions": "Install dependencies from README/requirements, confirm script entrypoints exist, and note in-file tunables (dataset/method) before running experiments.",
+          "results_path": "results/optuna"
+        },
+        {
+          "phase_id": "smoke",
+          "title": "Script smoke run",
+          "goal": "Run one README/script entrypoint to validate install and outputs.",
+          "depends_on": [
+            "setup"
+          ],
+          "variables": [
+            "script"
+          ],
+          "axes": {
+            "script": [
+              "optuna/_experimental.py"
+            ]
+          },
+          "run_template": "python {script}",
+          "matrix": [
+            {
+              "name": "smoke___experimental",
+              "variables": {
+                "script": "optuna/_experimental.py"
+              },
+              "run_command": "python optuna/_experimental.py",
+              "code_refs": [
+                "optuna/_experimental.py",
+                "README.md",
+                "optuna/importance/_fanova/_evaluator.py"
+              ],
+              "verify": [
+                "exit_code:0",
+                "exists:results/optuna/smoke"
+              ],
+              "results_path": "results/optuna/smoke",
+              "metrics": [
+                "The primary metric for HPO is typically the validation loss or accuracy achieved by the model trained with suggested hyperparameters.",
+                "Optuna's effectiveness is evaluated through its ability to explore complex, heterogeneous parameter spaces and its ease of use (lightweight nature) compared to other frameworks."
+              ],
+              "source": "repo"
+            }
+          ],
+          "planned_actions": "Execute `python optuna/_experimental.py` once; confirm it starts and writes logs.",
+          "results_path": "results/optuna/smoke"
+        },
+        {
+          "phase_id": "experiments",
+          "title": "Script experiments",
+          "goal": "Run grounded script entrypoints (or scraped dataset\u00d7method grid) serially.",
+          "depends_on": [
+            "smoke"
+          ],
+          "variables": [
+            "script"
+          ],
+          "axes": {
+            "script": [
+              "optuna/_experimental.py",
+              "optuna/importance/_fanova/_evaluator.py",
+              "optuna/importance/_ped_anova/evaluator.py",
+              "optuna/samplers/_tpe/_truncnorm.py",
+              "optuna/samplers/nsgaii/_constraints_evaluation.py",
+              "optuna/study/_constrained_optimization.py"
+            ]
+          },
+          "run_template": "python {script}",
+          "matrix": [
+            {
+              "name": "exp___experimental",
+              "variables": {
+                "script": "optuna/_experimental.py"
+              },
+              "run_command": "python optuna/_experimental.py",
+              "code_refs": [
+                "optuna/_experimental.py",
+                "README.md",
+                "optuna/importance/_fanova/_evaluator.py"
+              ],
+              "verify": [
+                "exit_code:0",
+                "exists:results/optuna/experiments/_experimental"
+              ],
+              "results_path": "results/optuna/experiments/_experimental",
+              "metrics": [
+                "The primary metric for HPO is typically the validation loss or accuracy achieved by the model trained with suggested hyperparameters.",
+                "Optuna's effectiveness is evaluated through its ability to explore complex, heterogeneous parameter spaces and its ease of use (lightweight nature) compared to other frameworks.",
+                "Best attained objective value (loss/error) after a fixed number of trials"
+              ],
+              "source": "repo"
+            },
+            {
+              "name": "exp___evaluator",
+              "variables": {
+                "script": "optuna/importance/_fanova/_evaluator.py"
+              },
+              "run_command": "python optuna/importance/_fanova/_evaluator.py",
+              "code_refs": [
+                "optuna/importance/_fanova/_evaluator.py",
+                "README.md",
+                "optuna/_experimental.py"
+              ],
+              "verify": [
+                "exit_code:0",
+                "exists:results/optuna/experiments/_evaluator"
+              ],
+              "results_path": "results/optuna/experiments/_evaluator",
+              "metrics": [
+                "The primary metric for HPO is typically the validation loss or accuracy achieved by the model trained with suggested hyperparameters.",
+                "Optuna's effectiveness is evaluated through its ability to explore complex, heterogeneous parameter spaces and its ease of use (lightweight nature) compared to other frameworks.",
+                "Best attained objective value (loss/error) after a fixed number of trials"
+              ],
+              "source": "repo"
+            },
+            {
+              "name": "exp__evaluator",
+              "variables": {
+                "script": "optuna/importance/_ped_anova/evaluator.py"
+              },
+              "run_command": "python optuna/importance/_ped_anova/evaluator.py",
+              "code_refs": [
+                "optuna/importance/_ped_anova/evaluator.py",
+                "README.md",
+                "optuna/_experimental.py",
+                "optuna/importance/_fanova/_evaluator.py"
+              ],
+              "verify": [
+                "exit_code:0",
+                "exists:results/optuna/experiments/evaluator"
+              ],
+              "results_path": "results/optuna/experiments/evaluator",
+              "metrics": [
+                "The primary metric for HPO is typically the validation loss or accuracy achieved by the model trained with suggested hyperparameters.",
+                "Optuna's effectiveness is evaluated through its ability to explore complex, heterogeneous parameter spaces and its ease of use (lightweight nature) compared to other frameworks.",
+                "Best attained objective value (loss/error) after a fixed number of trials"
+              ],
+              "source": "repo"
+            },
+            {
+              "name": "exp___truncnorm",
+              "variables": {
+                "script": "optuna/samplers/_tpe/_truncnorm.py"
+              },
+              "run_command": "python optuna/samplers/_tpe/_truncnorm.py",
+              "code_refs": [
+                "optuna/samplers/_tpe/_truncnorm.py",
+                "README.md",
+                "optuna/_experimental.py",
+                "optuna/importance/_fanova/_evaluator.py"
+              ],
+              "verify": [
+                "exit_code:0",
+                "exists:results/optuna/experiments/_truncnorm"
+              ],
+              "results_path": "results/optuna/experiments/_truncnorm",
+              "metrics": [
+                "The primary metric for HPO is typically the validation loss or accuracy achieved by the model trained with suggested hyperparameters.",
+                "Optuna's effectiveness is evaluated through its ability to explore complex, heterogeneous parameter spaces and its ease of use (lightweight nature) compared to other frameworks.",
+                "Best attained objective value (loss/error) after a fixed number of trials"
+              ],
+              "source": "repo"
+            },
+            {
+              "name": "exp___constraints_evaluation",
+              "variables": {
+                "script": "optuna/samplers/nsgaii/_constraints_evaluation.py"
+              },
+              "run_command": "python optuna/samplers/nsgaii/_constraints_evaluation.py",
+              "code_refs": [
+                "optuna/samplers/nsgaii/_constraints_evaluation.py",
+                "README.md",
+                "optuna/_experimental.py",
+                "optuna/importance/_fanova/_evaluator.py"
+              ],
+              "verify": [
+                "exit_code:0",
+                "exists:results/optuna/experiments/_constraints_evaluation"
+              ],
+              "results_path": "results/optuna/experiments/_constraints_evaluation",
+              "metrics": [
+                "The primary metric for HPO is typically the validation loss or accuracy achieved by the model trained with suggested hyperparameters.",
+                "Optuna's effectiveness is evaluated through its ability to explore complex, heterogeneous parameter spaces and its ease of use (lightweight nature) compared to other frameworks.",
+                "Best attained objective value (loss/error) after a fixed number of trials"
+              ],
+              "source": "repo"
+            },
+            {
+              "name": "exp___constrained_optimization",
+              "variables": {
+                "script": "optuna/study/_constrained_optimization.py"
+              },
+              "run_command": "python optuna/study/_constrained_optimization.py",
+              "code_refs": [
+                "optuna/study/_constrained_optimization.py",
+                "README.md",
+                "optuna/_experimental.py",
+                "optuna/importance/_fanova/_evaluator.py"
+              ],
+              "verify": [
+                "exit_code:0",
+                "exists:results/optuna/experiments/_constrained_optimization"
+              ],
+              "results_path": "results/optuna/experiments/_constrained_optimization",
+              "metrics": [
+                "The primary metric for HPO is typically the validation loss or accuracy achieved by the model trained with suggested hyperparameters.",
+                "Optuna's effectiveness is evaluated through its ability to explore complex, heterogeneous parameter spaces and its ease of use (lightweight nature) compared to other frameworks.",
+                "Best attained objective value (loss/error) after a fixed number of trials"
+              ],
+              "source": "repo"
+            }
+          ],
+          "planned_actions": "Edit in-file tunables when axes come from script scrape; do not invent CLI flags. Record dataset availability gaps in missing_context.",
+          "results_path": "results/optuna/experiments"
+        },
+        {
+          "phase_id": "summarize",
+          "title": "Aggregate results",
+          "goal": "Write/update summary.json aggregates from phase logs.",
+          "depends_on": [
+            "experiments"
+          ],
+          "variables": [],
+          "axes": {},
+          "run_template": "",
+          "matrix": [],
+          "planned_actions": "Collect metrics under results/optuna into results/optuna/summary.json; do not invent measured values.",
+          "results_path": "results/optuna/summary.json"
+        }
+      ],
+      "assumptions": [
+        "The repository is accessible and contains the specified Python scripts.",
+        "Standard scientific Python stack (matplotlib, pandas, scipy, scikit-learn) will be available for installation.",
+        "Scripts are designed to run standalone via `python <script>` without external data dependencies beyond standard libraries or internal mocks."
+      ],
+      "constraints": [
+        "Do not invent files or CLI IDs outside this exploration.",
+        "Results must adhere to the directory pattern: YYYY-MM-DD_HH-MM-SS__{benchmark_slug}__{method_slug}__seed-{seed}.",
+        "Metrics filenames must be metrics.csv and logs.txt within result directories."
+      ],
+      "missing_context": [
+        "Some source excerpts were truncated to fit the Planner context budget.",
+        "Specific dataset availability for certain evaluators is not explicitly confirmed in provided snippets (assumed internal or mocked).",
+        "Script tunables (dataset/method) were not scraped; confirm in-file defaults.",
+        "results_summary_path assumes repo creates summary.json; if not, Engineer will report 0 metrics captured unless per-row result artifacts under matrix results_path are readable.",
+        "setup phase rewritten to avoid venv-in-plan pattern; uses bare pip/python. Engineer creates a workspace-mounted .venv at runtime so installs persist across Docker containers."
+      ],
+      "verification_checks": [
+        "exit_code:0",
+        "exists:results/optuna/smoke",
+        "exists:results/optuna/experiments/*",
+        "exists:results/optuna/experiments/_experimental",
+        "exists:results/optuna/experiments/_evaluator",
+        "exists:results/optuna/experiments/evaluator",
+        "exists:results/optuna/experiments/_truncnorm",
+        "exists:results/optuna/experiments/_constraints_evaluation",
+        "exists:results/optuna/experiments/_constrained_optimization",
+        "entrypoint exists for each kept run_command",
+        "CLI flags documented in entrypoint argparse (when flags used)",
+        "manual OrderedDict / # set edits demoted to missing_context"
+      ],
+      "risks": [
+        "Experimental modules may raise warnings (e.g., ExperimentalWarning) which are expected but should be logged.",
+        "Serial execution of multiple scripts may take significant time depending on internal trial counts.",
+        "In-file OrderedDict edits are required when scripts expose no CLI flags."
+      ],
+      "organization": [
+        "Setup -> Smoke Test -> Serial Experiments -> Aggregation",
+        "Each experiment phase depends on the previous one completing successfully (exit_code 0)."
+      ],
+      "execution": [
+        "Follow phases in depends_on order.",
+        "Example run: python optuna/_experimental.py"
+      ],
+      "repo_usage": [
+        "optuna/_experimental.py",
+        "optuna/importance/_fanova/_evaluator.py",
+        "optuna/importance/_ped_anova/evaluator.py",
+        "optuna/samplers/_tpe/_truncnorm.py",
+        "optuna/samplers/nsgaii/_constraints_evaluation.py",
+        "optuna/study/_constrained_optimization.py",
+        "script:optuna/_experimental.py",
+        "script:optuna/importance/_fanova/_evaluator.py",
+        "script:optuna/importance/_ped_anova/evaluator.py",
+        "script:optuna/samplers/_tpe/_truncnorm.py",
+        "script:optuna/samplers/nsgaii/_constraints_evaluation.py",
+        "script:optuna/study/_constrained_optimization.py",
+        "test:tests/artifacts_tests/test_backoff.py",
+        "test:tests/artifacts_tests/test_boto3.py",
+        "test:tests/artifacts_tests/test_download_artifact.py",
+        "test:tests/artifacts_tests/test_filesystem.py",
+        "test:tests/artifacts_tests/test_gcs.py",
+        "test:tests/artifacts_tests/test_list_artifact_meta.py"
+      ],
+      "engineer_notes": [
+        "Prefer compact axes + a few example matrix rows (run_command/code_refs/verify).",
+        "Record dataset availability gaps in missing_context if scripts fail due to data issues."
+      ],
+      "results_summary_path": "results/optuna/summary.json"
+    }
+  }
+}

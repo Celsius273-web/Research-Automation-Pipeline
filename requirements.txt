@@ -1,0 +1,26 @@
+# Core LLM & orchestration
+langchain==0.1.14
+langgraph==0.0.21
+ollama==0.1.25
+
+# Data models & validation
+pydantic==2.5.3
+pydantic-core==2.14.6
+
+# HTTP & networking
+urllib3==2.1.0
+requests==2.31.0
+
+# Benchmark dependencies (optional)
+scikit-optimize==0.9.1
+numpy==1.24.3
+matplotlib==3.8.4
+networkx==3.2
+
+# Testing
+pytest==7.4.3
+pytest-cov==4.1.0
+
+# Utilities
+python-dotenv==1.0.0
+typing-extensions==4.9.0

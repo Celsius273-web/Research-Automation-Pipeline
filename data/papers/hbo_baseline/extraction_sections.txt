@@ -1,0 +1,500 @@
+Paper: hbo_baseline
+ID:    hbo_baseline
+
+Section: Abstract
+
+{
+  "research_question": "How does Hyperband improve hyperparameter optimization efficiency compared to Bayesian methods?",
+  "paper_overview": "The paper introduces **Hyperband**, a novel approach for hyperparameter optimization that frames the problem as an adaptive resource allocation task. Unlike traditional Bayesian Optimization (BO) which assumes smoothness or low effective dimensions, Hyperband uses early stopping on partially trained models to efficiently discard poor configurations while investing more resources in promising ones.",
+  "methodology": "1. **Adaptive Resource Allocation**: Instead of training all configurations fully, Hyperband allocates computational budget (e.g., epochs) dynamically.\n2. **Early Stopping Strategy**: Poor-performing runs are terminated early based on validation loss trends.\n3. **Pure-Exploration Bandit Formulation**: The problem is modeled as an infinite-armed bandit where the goal is to identify good configurations without relying on strong structural assumptions about the objective function.",
+  "datasets_or_benchmarks": [
+    "HPOlib benchmark library",
+    "117 multistage model selection tasks (including deep learning and kernel-based problems)"
+  ],
+  "variables": [],
+  "hyperparameters": {},
+  "evaluation_metrics": [
+    "Test accuracy / validation loss reduction speed"
+  ],
+  "reported_results": [
+    {
+      "benchmark": "HPOlib & Deep Learning Tasks",
+      "algorithm": "",
+      "metric_name": "Speedup over Bayesian Optimization (SMAC, TPE)",
+      "value": "5x to 30x faster",
+      "source": "Section 1 Abstract"
+    },
+    {
+      "benchmark": "Multistage Model Selection",
+      "algorithm": "",
+      "metric_name": "Number of configurations evaluated",
+      "value": "Orders-of-magnitude more than uniform training or standard BO",
+      "source": "Abstract & Section 4"
+    }
+  ],
+  "notes": "- Hyperband is theoretically grounded in the **infinite-armed bandit** setting.\n- It avoids assumptions about convergence rates that often fail empirically (unlike parametric methods).\n- The method scales well because it does not require fitting complex posterior distributions like Gaussian Processes."
+}
+
+Section: Method
+
+{
+  "research_question": "How does the Hyperband algorithm address the trade-off between exploration (number of configurations, n) and exploitation (resources per configuration, B/n), and what are its key components?",
+  "paper_overview": "The paper introduces **Hyperband**, a resource-efficient hyperparameter optimization method that addresses the fundamental challenge of balancing 'n versus B/n'\u2014the number of configurations to evaluate versus resources allocated per configuration. Unlike traditional methods requiring prior knowledge of envelope functions or loss distributions, Hyperband performs an automated grid search over feasible values of n for a fixed total budget B.",
+  "methodology": "**Hyperband** operates through two main components:\n1. **Inner Loop (SuccessiveHalving)**: For fixed values of n and r (resources), it iteratively runs configurations in batches, discards the bottom-performing ones based on intermediate losses, and retains top-k candidates.\n2. **Outer Loop**: Iterates over different trade-offs between n and B/n by varying parameters s (bracket index) and \u03b7 (discarding factor).\n\nThe algorithm defines several 'brackets,' each using approximately equal total resources but with increasing aggressiveness in early stopping:\n- Starts with aggressive brackets (high n, low r)\n- Progresses to conservative brackets (low n, high r)\n- Final bracket performs classical random search",
+  "datasets_or_benchmarks": [
+    "MNIST dataset"
+  ],
+  "variables": [
+    "R: Maximum resource per configuration (e.g., iterations/epochs)",
+    "\u03b7: Factor controlling proportion of configurations discarded each round (default=3)",
+    "n: Number of configurations",
+    "r: Resources allocated to initial batch in a bracket",
+    "s: Bracket index determining trade-off between n and r"
+  ],
+  "hyperparameters": {
+    "R": "description_of_parameter_and_its_role_in_the_methodology",
+    "\u03b7": "description_of_parameter_and_its_role_in_the_methodology"
+  },
+  "evaluation_metrics": [
+    "Validation loss (intermediate losses)",
+    "Test error rate across multiple trials"
+  ],
+  "reported_results": [
+    {
+      "benchmark": "MNIST with LeNet",
+      "algorithm": "",
+      "metric_name": "Average test error",
+      "value": "description_of_result_and_comparison_to_baseline",
+      "source": "Figure 3 comparison of individual brackets vs. standard Hyperband"
+    }
+  ],
+  "notes": "- **Consistency Guarantees**: Assumes uniform sampling from hyperparameter space; better priors improve performance.\n- **Adaptive Allocation**: Exploits situations where adaptive allocation works well while protecting against cases requiring conservative approaches.\n- **Cost Trade-off**: Requires approximately (smax + 1) times more work than single-value SuccessiveHalving but removes need for manual n selection."
+}
+
+Section: Experiments
+
+{
+  "research_question": "What are the theoretical guarantees and performance bounds for Hyperband in the non-stochastic infinite-horarmed bandit setting?",
+  "paper_overview": "The paper 'Bandit-Based Approach to Hyperparameter Optimization' by Li et al. (2016) formalizes hyperparameter optimization as a Non-Stochastic Infinite-Armed Bandit (NIAB) problem.",
+  "methodology": "The paper proposes using Hyperband, which employs a two-dimensional version of the 'doubling trick'. It non-adaptively searches over a grid of values for $n$ (number of arms) spaced geometrically apart. For each setting, it uses SuccessiveHalving to prune poor configurations. The algorithm successively doubles the total budget ($B$), ensuring that even without knowing the optimal $(n, B)$ pair beforehand, the cumulative effort does not exceed twice what would be needed if the optimum were known.",
+  "datasets_or_benchmarks": [
+    "Stochastic Infinite-armed Bandit Setting",
+    "General Parametric Assumptions (Equations 5 and 6)"
+  ],
+  "variables": [
+    "$\\ell_{i,k}$: Loss at step $k$ for arm $i$",
+    "$\\nu_i$: Limit loss of arm $i$ as $k \\to \\infty$",
+    "$F$: Cumulative distribution function (CDF) of the limit losses",
+    "$\\gamma(j)$: Bound on deviation from limit value after $j$ steps",
+    "$R$: Horizon where convergence is guaranteed ($\\gamma(R)=0$)",
+    "SuccessiveHalving (SH): Subroutine used by Hyperband to prune arms",
+    "n: Number of arms/configurations tested simultaneously",
+    "B: Total budget/number of measurements",
+    "\\delta: Error probability threshold",
+    "\u03b1, \\beta: Parameters defining the distribution F (accuracy gap decay)",
+    "T: Total exhausted budget"
+  ],
+  "hyperparameters": {
+    "budget_B": "Total computational budget allocated per configuration",
+    "n_arms": "Number of hyperparameter configurations sampled simultaneously in Successive Halving",
+    "r_k": "Resources (e.g., iterations) allocated to each arm at round $k$ in SH",
+    "k_stage_factor": "logarithmic scaling factor for stages in Hyperband",
+    "s_parallelism_factor": "Scaling factor determining parallel arms per stage",
+    "\u03b4_k_s_error_budget": "\\delta / (2^(k^3))"
+  },
+  "evaluation_metrics": [
+    "$\\hat{\\nu}$: Estimated best limit loss found with total budget $B$",
+    "Regret/Gap: Difference between the optimal possible solution and the achieved solution",
+    "Sample Complexity: Total number of resource pulls required to find a near-optimal configuration",
+    "Convergence rate of the best arm's mean estimate to true optimum ($\\nu_{\u016fT} - \\nu_*$)",
+    "Total number of samples taken",
+    "Probability of selecting an arm within the top q-fraction"
+  ],
+  "reported_results": [
+    {
+      "benchmark": "Non-stochastic Infinite-Horizon Setting (Theoretical Analysis)",
+      "algorithm": "Successive Halving (SH)",
+      "metric_name": "$z_{SH}$",
+      "value": "$2^{\\lceil \\log_2(n) \\rceil} \\max_{i=2,...,n} i(1 + \\gamma^{-1}(\\max\\{\\frac{\\epsilon}{4}, \\frac{\\nu_i-\\nu_1}{2}\\}))$",
+      "source": "Theorem 1 in the paper"
+    },
+    {
+      "benchmark": "Hyperband Algorithm Performance",
+      "algorithm": "Hyperband",
+      "metric_name": "Sample Complexity Bound",
+      "value": "$O(\\frac{B}{\\epsilon})$ under certain conditions, significantly better than random search or standard SH in high-dimensional spaces.",
+      "source": "Theoretical extension of Jamieson and Talwalkar (2015)"
+    },
+    {
+      "benchmark": "Stochastic Infinite-armed Bandits",
+      "algorithm": "",
+      "metric_name": "\u03bd\u016fT - \u03bd*",
+      "value": "\\leq c \\left(\\frac{\\log(T)^3 \\log(\\log(T)/\\delta)}{T}\\right)^{1/\\max\\{\\alpha,\\beta\\}}",
+      "source": "Theorem 5"
+    },
+    {
+      "benchmark": "Uniform Allocation in Hyperband",
+      "algorithm": "",
+      "metric_name": "\u03bd\u016fT - \u03bd*",
+      "value": "\\leq c \\left(\\frac{\\log(T)\\log(\\log(T)/\\delta)}{T}\\right)^{1/(\\alpha+\\beta)}",
+      "source": "Theorem 5 (modified proof)"
+    }
+  ],
+  "notes": "- The paper distinguishes between the 'finite horizon' setting ($R < \\infty$, known convergence point) and the 'infinite horizon' setting ($R = \\infty$). Hyperband is analyzed primarily in the infinite-horizon case for theoretical tractability, though finite horizons are more common in practice.\n- The function $\\gamma(j)$ represents how quickly a model's validation loss converges. If training on full data takes time $T$, then $\\gamma(k)=0$ for all $k \\ge T$.\n- Hyperband dynamically allocates resources by running multiple instances of Successive Halving with different budgets ($B_{k,s} = 2^k, n_{k,s} = 2^s$) and combining their results.\nHyperband addresses the issue of not knowing the optimal $n$ or $B$. By trying different values in a specific order and doubling the budget, it ensures that the loss from identifying the 'best' setting is no more than $\\log(B)$ times necessary. The paper shows that SuccessiveHalving generally requires less average resource per arm compared to uniform allocation for distinguishing top arms."
+}
+
+Section: Hyperparameters
+
+{
+  "research_question": "Does Hyperband outperform other hyperparameter optimization methods (e.g., SMAC, TPE, random search) when using dataset subsampling as the resource metric across diverse datasets?",
+  "paper_overview": "The paper introduces and empirically evaluates **Hyperband**, a novel algorithm for efficient hyperparameter optimization. It addresses the challenge of finding good configurations within limited computational budgets by combining two key ideas: (1) early stopping of poor-performing configurations, and (2) adaptive resource allocation via successive halving across multiple brackets with exponentially increasing resources.",
+  "methodology": "The authors compare Hyperband against several baselines including SMAC, TPE, Spearmint, random search, and variants like 'bracket s=4' (repeating the most exploratory bracket). Experiments are conducted on three main benchmarks: CIFAR-10, MRBI, SVHN. Additionally, a large-scale study is performed across 117 datasets from OpenML using an automated framework that explores classifiers, feature preprocessing, and data downsampling strategies.",
+  "datasets_or_benchmarks": [
+    "CIFAR-10",
+    "MRBI",
+    "SVHN",
+    "OpenML (117 binary/multiclass classification datasets)"
+  ],
+  "variables": [
+    "Algorithm type (Hyperband finite/infinite, SMAC, TPE, random search)",
+    "Resource budget (measured in multiples of R or iterations)",
+    "Dataset size and complexity",
+    "Model architecture constraints"
+  ],
+  "hyperparameters": {
+    "eta": "value controlling the growth rate between brackets; set to 3 for OpenML experiments, 4 for CIFAR-10 infinite horizon test.",
+    "R": "maximum resource per bracket (set to full training set size in subsampling experiments)",
+    "nmax": "maximum number of configurations per bracket; limited to max{9, R/1000} in OpenML study",
+    "B": "starting budget for infinite horizon variant"
+  },
+  "evaluation_metrics": [
+    "Average test error (primary metric)",
+    "Speedup factor relative to random search or other methods within a fixed resource window",
+    "Consistency across trials (low variance)"
+  ],
+  "reported_results": [
+    {
+      "benchmark": "CIFAR-10",
+      "algorithm": "",
+      "metric_name": "Average Test Error vs. Resource Budget",
+      "value": "As shown in Figure 4(a), Hyperband achieves significantly lower test error faster than competitors, being over an order-of-magnitude quicker than others within the same resource window.",
+      "source": "Figure 4(a) and accompanying text"
+    },
+    {
+      "benchmark": "MRBI",
+      "algorithm": "",
+      "metric_name": "Average Test Error vs. Resource Budget",
+      "value": "Hyperband is over an order-of-magnitude faster than standard configuration selection approaches and 5\u00d7 faster than SMAC (early). See Figure 4(b).",
+      "source": "Figure 4(b) and text"
+    },
+    {
+      "benchmark": "SVHN",
+      "algorithm": "",
+      "metric_name": "Average Test Error vs. Resource Budget",
+      "value": "While Hyperband finds good configurations faster, Bayesian methods are competitive here; SMAC (early) even outperforms Hyperband in some cases. See Figure 4(c).",
+      "source": "Figure 4(c) and text"
+    },
+    {
+      "benchmark": "OpenML (117 datasets)",
+      "algorithm": "",
+      "metric_name": "Speedup due to subsampling on specific subsets",
+      "value": "On a subset of 21 datasets, Hyperband achieved at least a 3\u00d7 speedup via 8\u00d7 downsampling. Full results across all 117 are referenced in Figure 5(a,b) (not fully reproduced here).",
+      "source": "Section 4.2.1"
+    }
+  ],
+  "notes": "- Comparisons use 'iterations' instead of wall-clock time to ensure hardware independence, though overhead for Hyperband is <5% on tested machines.\n- Infinite horizon Hyperband underperforms finite version within fixed budgets because it must tune max resource R and starts with less aggressive early stopping.\n- On CIFAR-10, state-of-the-art results using more data (including validation set) achieve ~17.0% error vs. our 15.0\u201318% range depending on setup; this gap is attributed to larger training sets and extended epochs in prior work."
+}
+
+Section: Appendix
+
+{
+  "research_question": "What is the main contribution of the paper \"Bandit-Based Approach to Hyperparameter Optimization\"?",
+  "paper_overview": "The paper proposes a new approach called Hyperband, which uses multi-armed bandits (MAB) for hyperparameter optimization. It aims to efficiently find good hyperparameters by allocating resources adaptively based on early performance feedback.",
+  "methodology": "Hyperband combines two key ideas:\n1. **Successive Halving**: A resource allocation algorithm that starts with many configurations trained on small budgets, then progressively trains the best-performing ones on larger budgets.\n2. **Multi-Armed Bandits (MAB)**: Specifically, it uses a variant of Thompson Sampling to decide which configuration-budget pairs should receive more resources in subsequent rounds.",
+  "datasets_or_benchmarks": [
+    "SVHN",
+    "CIFAR-10",
+    "MNIST"
+  ],
+  "variables": [
+    "Hyperparameters (e.g., C, gamma, degree)",
+    "Preprocessing methods (min/max, standardize, normalize)",
+    "Kernel types (rbf, polynomial, sigmoid)",
+    "\\nu^* (target value)",
+    "b_\\nu (estimated lower bound for \\nu^*)",
+    "\\gamma, B/n (scaling parameters related to interval widths)",
+    "F^{-1} (inverse CDF of the underlying distribution)",
+    "n, k, l (sample sizes or iteration indices)",
+    "\\delta, c (confidence and absolute constants)",
+    "\\alpha, \\beta (exponents governing the tail behavior of F)",
+    "\\Delta (target accuracy parameter)",
+    "H(F, \\gamma, n, \\delta) (complexity/cost function)",
+    "B_{k,l} (bound on number of measurements or budget)",
+    "hyperparameters (learning rate, batch size, etc.)",
+    "number of epochs per configuration",
+    "computational budget",
+    "Learning Rate",
+    "Batch size",
+    "Layer-2 Num Kernels (k2)",
+    "Layer-1 Num Kernels (k1)"
+  ],
+  "hyperparameters": {
+    "C": "log[10^-3, 10^5]",
+    "gamma": "log[10^-5, 10]",
+    "degree": "[2, 5] (if kernel=poly)",
+    "coef0": "uniform[-1.0, 1.0] (if kernel=poly or sigmoid)",
+    "alpha_beta_relation": "The analysis distinguishes between cases where $\\alpha = \\beta$ and $\\alpha \\neq \\beta$, affecting the final bound's form.",
+    "confidence_delta": "\\delta controls the failure probability, appearing in logarithmic terms like $\\log(1/\\delta)$.",
+    "learning_rate": "adaptive based on performance trends",
+    "batch_size": "optimized via bandit allocation",
+    "epochs_per_config": "dynamically determined by Hyperband's pruning strategy"
+  },
+  "evaluation_metrics": [
+    "Average test error",
+    "Computation time",
+    "Probability of success ($\\ge 1-\\delta$)",
+    "Error bounds: $|\\hat{\\nu}_i - \\nu^*|$",
+    "Sample complexity (number of measurements)",
+    "validation accuracy",
+    "training time efficiency (FLOPs or wall-clock time)",
+    "regret bounds compared to random search and Bayesian optimization"
+  ],
+  "reported_results": [
+    {
+      "benchmark": "SVHN",
+      "algorithm": "",
+      "metric_name": "Test Error",
+      "value": "",
+      "source": "Figure 11"
+    },
+    {
+      "benchmark": "CIFAR-10 (Kernel Classification)",
+      "algorithm": "",
+      "metric_name": "Average Test Error of Best Model",
+      "value": "",
+      "source": "Figure 12"
+    },
+    {
+      "benchmark": "CIFAR-10 (Random Features Kernel Approximation)",
+      "algorithm": "",
+      "metric_name": "Average Test Error of Best Model",
+      "value": "",
+      "source": "Figure 13"
+    },
+    {
+      "benchmark": "MNIST classification with CNNs",
+      "algorithm": "",
+      "metric_name": "validation accuracy vs. computational cost",
+      "value": "Achieved state-of-the-art results while using significantly fewer FLOPs compared to random search and Bayesian optimization.",
+      "source": "Li et al., ICLR 2017"
+    },
+    {
+      "benchmark": "CIFAR-10 classification with ResNet",
+      "algorithm": "",
+      "metric_name": "accuracy improvement over baselines",
+      "value": "+X% relative to random search, +Y% compared to standard Bayesian optimization (exact numbers depend on specific runs).",
+      "source": "Li et al., ICLR 2017"
+    },
+    {
+      "benchmark": "Hyperband Brackets",
+      "algorithm": "",
+      "metric_name": "n_i values for s=4,3,2,1,0",
+      "value": "[81, 27, 9, 6, 5]",
+      "source": "Table 1"
+    },
+    {
+      "benchmark": "Kernel Regularized Least Squares",
+      "algorithm": "",
+      "metric_name": "Hyperparameter Space",
+      "value": "Learning Rate: log[1e-3, 1e-1], Batch size: log[1e1, 1e3], k2: linear[10,60], k1: linear[5,k2]",
+      "source": "Table 4"
+    },
+    {
+      "benchmark": "Random Feature Kernel Approximation",
+      "algorithm": "",
+      "metric_name": "Hyperparameter Space",
+      "value": "preprocessor: [none, min/max, standardize, normalize], lambda: log[1e-3, 1e5], gamma: log[1e-5, 10]",
+      "source": "Table 5"
+    }
+  ],
+  "notes": "- The paper highlights shortcomings in the experimental setup, such as random search testing varying numbers of configurations depending on dataset size.\n- Hyperband assumes computation scales linearly with data set size; for very small datasets, initialization overheads dominate.\n- Some classifiers/preprocessing methods cause memory errors (quadratic storage requirements), which can waste time if a searcher trains on a subsample but fails on the full dataset.\nThe text cuts off at the definition of 'T', which represents the total number of measurements. The final expression for $B_{k,l}$ is derived as a bound on this quantity, specifically shown to be proportional to $z_\\Delta \\log(\\log(z_\\delta)/\\delta)$ where $z_\\Delta = (\\log(\\Delta^{-1}))^2 \\Delta^{-\\max\\{\\beta, \\alpha\\}}$. The result highlights a dependency on the maximum of exponents $\\beta$ and $\\alpha$, modulated by logarithmic factors.\n- Hyperband is particularly effective when the evaluation of a hyperparameter configuration requires multiple epochs.\n- The method naturally handles early stopping by discarding poor configurations before they consume too many resources.\n- It can be combined with other bandit algorithms (e.g., Thompson Sampling, UCB) for different exploration-exploitation trade-offs.\nExtracted tables from Appendix pages. Table 1 shows Hyperband bracket parameters (n_i, r_i). Tables 4 and 5 define hyperparameter search spaces for specific classification problems."
+}
+
+=== Merged ===
+
+{
+  "research_question": "How does Hyperband improve hyperparameter optimization efficiency compared to Bayesian methods?",
+  "paper_overview": "The paper introduces **Hyperband**, a novel approach for hyperparameter optimization that frames the problem as an adaptive resource allocation task. Unlike traditional Bayesian Optimization (BO) which assumes smoothness or low effective dimensions, Hyperband uses early stopping on partially trained models to efficiently discard poor configurations while investing more resources in promising ones.",
+  "methodology": "1. **Adaptive Resource Allocation**: Instead of training all configurations fully, Hyperband allocates computational budget (e.g., epochs) dynamically.\n2. **Early Stopping Strategy**: Poor-performing runs are terminated early based on validation loss trends.\n3. **Pure-Exploration Bandit Formulation**: The problem is modeled as an infinite-armed bandit where the goal is to identify good configurations without relying on strong structural assumptions about the objective function.",
+  "datasets_or_benchmarks": [
+    "HPOlib benchmark library",
+    "117 multistage model selection tasks (including deep learning and kernel-based problems)",
+    "MNIST dataset",
+    "Stochastic Infinite-armed Bandit Setting",
+    "General Parametric Assumptions (Equations 5 and 6)",
+    "CIFAR-10",
+    "MRBI",
+    "SVHN",
+    "OpenML (117 binary/multiclass classification datasets)",
+    "MNIST"
+  ],
+  "variables": [
+    "R: Maximum resource per configuration (e.g., iterations/epochs)",
+    "\u03b7: Factor controlling proportion of configurations discarded each round (default=3)",
+    "n: Number of configurations",
+    "r: Resources allocated to initial batch in a bracket",
+    "s: Bracket index determining trade-off between n and r",
+    "$\\ell_{i,k}$: Loss at step $k$ for arm $i$",
+    "$\\nu_i$: Limit loss of arm $i$ as $k \\to \\infty$",
+    "$F$: Cumulative distribution function (CDF) of the limit losses",
+    "$\\gamma(j)$: Bound on deviation from limit value after $j$ steps",
+    "$R$: Horizon where convergence is guaranteed ($\\gamma(R)=0$)",
+    "SuccessiveHalving (SH): Subroutine used by Hyperband to prune arms",
+    "n: Number of arms/configurations tested simultaneously",
+    "B: Total budget/number of measurements",
+    "\\delta: Error probability threshold",
+    "\u03b1, \\beta: Parameters defining the distribution F (accuracy gap decay)",
+    "T: Total exhausted budget",
+    "Algorithm type (Hyperband finite/infinite, SMAC, TPE, random search)",
+    "Resource budget (measured in multiples of R or iterations)",
+    "Dataset size and complexity",
+    "Model architecture constraints",
+    "Hyperparameters (e.g., C, gamma, degree)",
+    "Preprocessing methods (min/max, standardize, normalize)",
+    "Kernel types (rbf, polynomial, sigmoid)",
+    "\\nu^* (target value)",
+    "b_\\nu (estimated lower bound for \\nu^*)",
+    "\\gamma, B/n (scaling parameters related to interval widths)",
+    "F^{-1} (inverse CDF of the underlying distribution)",
+    "n, k, l (sample sizes or iteration indices)",
+    "\\delta, c (confidence and absolute constants)",
+    "\\alpha, \\beta (exponents governing the tail behavior of F)",
+    "\\Delta (target accuracy parameter)",
+    "H(F, \\gamma, n, \\delta) (complexity/cost function)",
+    "B_{k,l} (bound on number of measurements or budget)",
+    "hyperparameters (learning rate, batch size, etc.)",
+    "number of epochs per configuration",
+    "computational budget",
+    "Learning Rate",
+    "Batch size",
+    "Layer-2 Num Kernels (k2)",
+    "Layer-1 Num Kernels (k1)"
+  ],
+  "hyperparameters": {
+    "r": "description_of_parameter_and_its_role_in_the_methodology",
+    "\u03b7": "description_of_parameter_and_its_role_in_the_methodology",
+    "budget_b": "Total computational budget allocated per configuration",
+    "n_arms": "Number of hyperparameter configurations sampled simultaneously in Successive Halving",
+    "r_k": "Resources (e.g., iterations) allocated to each arm at round $k$ in SH",
+    "k_stage_factor": "logarithmic scaling factor for stages in Hyperband",
+    "s_parallelism_factor": "Scaling factor determining parallel arms per stage",
+    "\u03b4_k_s_error_budget": "\\delta / (2^(k^3))",
+    "eta": "value controlling the growth rate between brackets; set to 3 for OpenML experiments, 4 for CIFAR-10 infinite horizon test.",
+    "nmax": "maximum number of configurations per bracket; limited to max{9, R/1000} in OpenML study",
+    "b": "starting budget for infinite horizon variant",
+    "c": "log[10^-3, 10^5]",
+    "gamma": "log[10^-5, 10]",
+    "degree": "[2, 5] (if kernel=poly)",
+    "coef0": "uniform[-1.0, 1.0] (if kernel=poly or sigmoid)",
+    "alpha_beta_relation": "The analysis distinguishes between cases where $\\alpha = \\beta$ and $\\alpha \\neq \\beta$, affecting the final bound's form.",
+    "confidence_delta": "\\delta controls the failure probability, appearing in logarithmic terms like $\\log(1/\\delta)$.",
+    "learning_rate": "adaptive based on performance trends",
+    "batch_size": "optimized via bandit allocation",
+    "epochs_per_config": "dynamically determined by Hyperband's pruning strategy"
+  },
+  "evaluation_metrics": [
+    "Test accuracy / validation loss reduction speed",
+    "Validation loss (intermediate losses)",
+    "Test error rate across multiple trials",
+    "$\\hat{\\nu}$: Estimated best limit loss found with total budget $B$",
+    "Regret/Gap: Difference between the optimal possible solution and the achieved solution",
+    "Sample Complexity: Total number of resource pulls required to find a near-optimal configuration",
+    "Convergence rate of the best arm's mean estimate to true optimum ($\\nu_{\u016fT} - \\nu_*$)",
+    "Total number of samples taken",
+    "Probability of selecting an arm within the top q-fraction",
+    "Average test error (primary metric)",
+    "Speedup factor relative to random search or other methods within a fixed resource window",
+    "Consistency across trials (low variance)",
+    "Average test error",
+    "Computation time",
+    "Probability of success ($\\ge 1-\\delta$)",
+    "Error bounds: $|\\hat{\\nu}_i - \\nu^*|$",
+    "Sample complexity (number of measurements)",
+    "validation accuracy",
+    "training time efficiency (FLOPs or wall-clock time)",
+    "regret bounds compared to random search and Bayesian optimization"
+  ],
+  "reported_results": [
+    {
+      "benchmark": "HPOlib & Deep Learning Tasks",
+      "algorithm": "",
+      "metric_name": "Speedup over Bayesian Optimization (SMAC, TPE)",
+      "value": "5x to 30x faster",
+      "source": "Section 1 Abstract"
+    },
+    {
+      "benchmark": "Non-stochastic Infinite-Horizon Setting (Theoretical Analysis)",
+      "algorithm": "Successive Halving (SH)",
+      "metric_name": "$z_{SH}$",
+      "value": "$2^{\\lceil \\log_2(n) \\rceil} \\max_{i=2,...,n} i(1 + \\gamma^{-1}(\\max\\{\\frac{\\epsilon}{4}, \\frac{\\nu_i-\\nu_1}{2}\\}))$",
+      "source": "Theorem 1 in the paper"
+    },
+    {
+      "benchmark": "Stochastic Infinite-armed Bandits",
+      "algorithm": "",
+      "metric_name": "\u03bd\u016fT - \u03bd*",
+      "value": "\\leq c \\left(\\frac{\\log(T)^3 \\log(\\log(T)/\\delta)}{T}\\right)^{1/\\max\\{\\alpha,\\beta\\}}",
+      "source": "Theorem 5"
+    },
+    {
+      "benchmark": "Uniform Allocation in Hyperband",
+      "algorithm": "",
+      "metric_name": "\u03bd\u016fT - \u03bd*",
+      "value": "\\leq c \\left(\\frac{\\log(T)\\log(\\log(T)/\\delta)}{T}\\right)^{1/(\\alpha+\\beta)}",
+      "source": "Theorem 5 (modified proof)"
+    },
+    {
+      "benchmark": "MRBI",
+      "algorithm": "",
+      "metric_name": "Average Test Error vs. Resource Budget",
+      "value": "Hyperband is over an order-of-magnitude faster than standard configuration selection approaches and 5\u00d7 faster than SMAC (early). See Figure 4(b).",
+      "source": "Figure 4(b) and text"
+    },
+    {
+      "benchmark": "SVHN",
+      "algorithm": "",
+      "metric_name": "Average Test Error vs. Resource Budget",
+      "value": "While Hyperband finds good configurations faster, Bayesian methods are competitive here; SMAC (early) even outperforms Hyperband in some cases. See Figure 4(c).",
+      "source": "Figure 4(c) and text"
+    },
+    {
+      "benchmark": "OpenML (117 datasets)",
+      "algorithm": "",
+      "metric_name": "Speedup due to subsampling on specific subsets",
+      "value": "On a subset of 21 datasets, Hyperband achieved at least a 3\u00d7 speedup via 8\u00d7 downsampling. Full results across all 117 are referenced in Figure 5(a,b) (not fully reproduced here).",
+      "source": "Section 4.2.1"
+    },
+    {
+      "benchmark": "Hyperband Brackets",
+      "algorithm": "",
+      "metric_name": "n_i values for s=4,3,2,1,0",
+      "value": "[81, 27, 9, 6, 5]",
+      "source": "Table 1"
+    },
+    {
+      "benchmark": "Kernel Regularized Least Squares",
+      "algorithm": "",
+      "metric_name": "Hyperparameter Space",
+      "value": "Learning Rate: log[1e-3, 1e-1], Batch size: log[1e1, 1e3], k2: linear[10,60], k1: linear[5,k2]",
+      "source": "Table 4"
+    },
+    {
+      "benchmark": "Random Feature Kernel Approximation",
+      "algorithm": "",
+      "metric_name": "Hyperparameter Space",
+      "value": "preprocessor: [none, min/max, standardize, normalize], lambda: log[1e-3, 1e5], gamma: log[1e-5, 10]",
+      "source": "Table 5"
+    }
+  ],
+  "notes": "- Hyperband is theoretically grounded in the **infinite-armed bandit** setting.\n- It avoids assumptions about convergence rates that often fail empirically (unlike parametric methods).\n- The method scales well because it does not require fitting complex posterior distributions like Gaussian Processes.\n- **Consistency Guarantees**: Assumes uniform sampling from hyperparameter space; better priors improve performance.\n- **Adaptive Allocation**: Exploits situations where adaptive allocation works well while protecting against cases requiring conservative approaches.\n- **Cost Trade-off**: Requires approximately (smax + 1) times more work than single-value SuccessiveHalving but removes need for manual n selection.\n- The paper distinguishes between the 'finite horizon' setting ($R < \\infty$, known convergence point) and the 'infinite horizon' setting ($R = \\infty$). Hyperband is analyzed primarily in the infinite-horizon case for theoretical tractability, though finite horizons are more common in practice.\n- The function $\\gamma(j)$ represents how quickly a model's validation loss converges. If training on full data takes time $T$, then $\\gamma(k)=0$ for all $k \\ge T$.\n- Hyperband dynamically allocates resources by running multiple instances of Successive Halving with different budgets ($B_{k,s} = 2^k, n_{k,s} = 2^s$) and combining their results.\nHyperband addresses the issue of not knowing the optimal $n$ or $B$. By trying different values in a specific order and doubling the budget, it ensures that the loss from identifying the 'best' setting is no more than $\\log(B)$ times necessary. The paper shows that SuccessiveHalving generally requires less average resource per arm compared to uniform allocation for distinguishing top arms.\n- Comparisons use 'iterations' instead of wall-clock time to ensure hardware independence, though overhead for Hyperband is <5% on tested machines.\n- Infinite horizon Hyperband underperforms finite version within fixed budgets because it must tune max resource R and starts with less aggressive early stopping.\n- On CIFAR-10, state-of-the-art results using more data (including validation set) achieve ~17.0% error vs. our 15.0\u201318% range depending on setup; this gap is attributed to larger training sets and extended epochs in prior work.\n- The paper highlights shortcomings in the experimental setup, such as random search testing varying numbers of configurations depending on dataset size.\n- Hyperband assumes computation scales linearly with data set size; for very small datasets, initialization overheads dominate.\n- Some classifiers/preprocessing methods cause memory errors (quadratic storage requirements), which can waste time if a searcher trains on a subsample but fails on the full dataset.\nThe text cuts off at the definition of 'T', which represents the total number of measurements. The final expression for $B_{k,l}$ is derived as a bound on this quantity, specifically shown to be proportional to $z_\\Delta \\log(\\log(z_\\delta)/\\delta)$ where $z_\\Delta = (\\log(\\Delta^{-1}))^2 \\Delta^{-\\max\\{\\beta, \\alpha\\}}$. The result highlights a dependency on the maximum of exponents $\\beta$ and $\\alpha$, modulated by logarithmic factors.\n- Hyperband is particularly effective when the evaluation of a hyperparameter configuration requires multiple epochs.\n- The method naturally handles early stopping by discarding poor configurations before they consume too many resources.\n- It can be combined with other bandit algorithms (e.g., Thompson Sampling, UCB) for different exploration-exploitation trade-offs.\nExtracted tables from Appendix pages. Table 1 shows Hyperband bracket parameters (n_i, r_i). Tables 4 and 5 define hyperparameter search spaces for specific classification problems."
+}

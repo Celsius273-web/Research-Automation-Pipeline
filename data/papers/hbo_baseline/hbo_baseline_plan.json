@@ -1,0 +1,335 @@
+{
+  "paper": {
+    "paper_id": "hbo_baseline",
+    "title": "hbo_baseline",
+    "pdf_path": "/Users/school/ResearchAssistant/data/papers/hbo_baseline/paper.pdf",
+    "arxiv_id": null
+  },
+  "plan_review": {
+    "status": "approved",
+    "notes": "Auto-approved (non-interactive mode)."
+  },
+  "source_extraction_path": "/Users/school/ResearchAssistant/data/papers/hbo_baseline/hbo_baseline.json",
+  "plan_envelope": {
+    "schema_version": "2.0",
+    "agent": "planner",
+    "status": "ok",
+    "unknowns": [],
+    "warnings": [
+      "setup phase contained python -m venv / .venv/bin patterns; rewritten to bare pip/python",
+      "phases rebuilt deterministically from execution_surface scaffolds and Analyst lists.",
+      "execution_surface=script",
+      "plan verification kept 7 matrix row(s); none demoted.",
+      "results_summary_path feasibility unchecked or undocumented for results/hbo_baseline/summary.json"
+    ],
+    "payload": {
+      "plan_summary": "Execute setup, smoke test with example_1_local_sequential.py, then run all 6 script examples serially to collect metrics (test accuracy/loss), finally aggregate into summary.json.",
+      "domain": "hyperband_optimization_baselines",
+      "objective": "Validate installation and benchmark sequential vs parallel execution strategies on MNIST/CIFAR-10 using provided scripts.",
+      "phases": [
+        {
+          "phase_id": "setup",
+          "title": "Environment setup",
+          "goal": "Install repository dependencies and confirm entrypoints from README.",
+          "depends_on": [],
+          "variables": [],
+          "axes": {},
+          "run_template": "pip install . matplotlib pandas scipy scikit-learn",
+          "matrix": [],
+          "planned_actions": "Install dependencies from README/requirements, confirm script entrypoints exist, and note in-file tunables (dataset/method) before running experiments.",
+          "results_path": "results/hbo_baseline"
+        },
+        {
+          "phase_id": "smoke",
+          "title": "Script smoke run",
+          "goal": "Run one README/script entrypoint to validate install and outputs.",
+          "depends_on": [
+            "setup"
+          ],
+          "variables": [
+            "script"
+          ],
+          "axes": {
+            "script": [
+              "build/lib/hpbandster/examples/example_1_local_sequential.py"
+            ]
+          },
+          "run_template": "python {script}",
+          "matrix": [
+            {
+              "name": "smoke__example_1_local_sequential",
+              "variables": {
+                "script": "build/lib/hpbandster/examples/example_1_local_sequential.py"
+              },
+              "run_command": "python build/lib/hpbandster/examples/example_1_local_sequential.py",
+              "code_refs": [
+                "build/lib/hpbandster/examples/example_1_local_sequential.py",
+                "README.md",
+                "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+              ],
+              "verify": [
+                "exit_code:0",
+                "exists:results/hbo_baseline/smoke"
+              ],
+              "results_path": "results/hbo_baseline/smoke",
+              "metrics": [
+                "Test accuracy / validation loss reduction speed",
+                "Validation loss (intermediate losses)"
+              ],
+              "source": "repo"
+            }
+          ],
+          "planned_actions": "Execute `python build/lib/hpbandster/examples/example_1_local_sequential.py` once; confirm it starts and writes logs.",
+          "results_path": "results/hbo_baseline/smoke"
+        },
+        {
+          "phase_id": "experiments",
+          "title": "Script experiments",
+          "goal": "Run grounded script entrypoints (or scraped dataset\u00d7method grid) serially.",
+          "depends_on": [
+            "smoke"
+          ],
+          "variables": [
+            "script"
+          ],
+          "axes": {
+            "script": [
+              "build/lib/hpbandster/examples/example_1_local_sequential.py",
+              "build/lib/hpbandster/examples/example_2_local_parallel_threads.py",
+              "build/lib/hpbandster/examples/example_3_local_parallel_processes.py",
+              "build/lib/hpbandster/examples/example_4_cluster.py",
+              "build/lib/hpbandster/examples/example_5_keras_worker.py",
+              "build/lib/hpbandster/examples/example_5_mnist.py"
+            ]
+          },
+          "run_template": "python {script}",
+          "matrix": [
+            {
+              "name": "exp__example_1_local_sequential",
+              "variables": {
+                "script": "build/lib/hpbandster/examples/example_1_local_sequential.py"
+              },
+              "run_command": "python build/lib/hpbandster/examples/example_1_local_sequential.py",
+              "code_refs": [
+                "build/lib/hpbandster/examples/example_1_local_sequential.py",
+                "README.md",
+                "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+              ],
+              "verify": [
+                "exit_code:0",
+                "exists:results/hbo_baseline/experiments/example_1_local_sequential"
+              ],
+              "results_path": "results/hbo_baseline/experiments/example_1_local_sequential",
+              "metrics": [
+                "Test accuracy / validation loss reduction speed",
+                "Validation loss (intermediate losses)",
+                "Test error rate across multiple trials"
+              ],
+              "source": "repo"
+            },
+            {
+              "name": "exp__example_2_local_parallel_threads",
+              "variables": {
+                "script": "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+              },
+              "run_command": "python build/lib/hpbandster/examples/example_2_local_parallel_threads.py",
+              "code_refs": [
+                "build/lib/hpbandster/examples/example_2_local_parallel_threads.py",
+                "README.md",
+                "build/lib/hpbandster/examples/example_1_local_sequential.py"
+              ],
+              "verify": [
+                "exit_code:0",
+                "exists:results/hbo_baseline/experiments/example_2_local_parallel_threads"
+              ],
+              "results_path": "results/hbo_baseline/experiments/example_2_local_parallel_threads",
+              "metrics": [
+                "Test accuracy / validation loss reduction speed",
+                "Validation loss (intermediate losses)",
+                "Test error rate across multiple trials"
+              ],
+              "source": "repo"
+            },
+            {
+              "name": "exp__example_3_local_parallel_processes",
+              "variables": {
+                "script": "build/lib/hpbandster/examples/example_3_local_parallel_processes.py"
+              },
+              "run_command": "python build/lib/hpbandster/examples/example_3_local_parallel_processes.py",
+              "code_refs": [
+                "build/lib/hpbandster/examples/example_3_local_parallel_processes.py",
+                "README.md",
+                "build/lib/hpbandster/examples/example_1_local_sequential.py",
+                "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+              ],
+              "verify": [
+                "exit_code:0",
+                "exists:results/hbo_baseline/experiments/example_3_local_parallel_processes"
+              ],
+              "results_path": "results/hbo_baseline/experiments/example_3_local_parallel_processes",
+              "metrics": [
+                "Test accuracy / validation loss reduction speed",
+                "Validation loss (intermediate losses)",
+                "Test error rate across multiple trials"
+              ],
+              "source": "repo"
+            },
+            {
+              "name": "exp__example_4_cluster",
+              "variables": {
+                "script": "build/lib/hpbandster/examples/example_4_cluster.py"
+              },
+              "run_command": "python build/lib/hpbandster/examples/example_4_cluster.py",
+              "code_refs": [
+                "build/lib/hpbandster/examples/example_4_cluster.py",
+                "README.md",
+                "build/lib/hpbandster/examples/example_1_local_sequential.py",
+                "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+              ],
+              "verify": [
+                "exit_code:0",
+                "exists:results/hbo_baseline/experiments/example_4_cluster"
+              ],
+              "results_path": "results/hbo_baseline/experiments/example_4_cluster",
+              "metrics": [
+                "Test accuracy / validation loss reduction speed",
+                "Validation loss (intermediate losses)",
+                "Test error rate across multiple trials"
+              ],
+              "source": "repo"
+            },
+            {
+              "name": "exp__example_5_keras_worker",
+              "variables": {
+                "script": "build/lib/hpbandster/examples/example_5_keras_worker.py"
+              },
+              "run_command": "python build/lib/hpbandster/examples/example_5_keras_worker.py",
+              "code_refs": [
+                "build/lib/hpbandster/examples/example_5_keras_worker.py",
+                "README.md",
+                "build/lib/hpbandster/examples/example_1_local_sequential.py",
+                "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+              ],
+              "verify": [
+                "exit_code:0",
+                "exists:results/hbo_baseline/experiments/example_5_keras_worker"
+              ],
+              "results_path": "results/hbo_baseline/experiments/example_5_keras_worker",
+              "metrics": [
+                "Test accuracy / validation loss reduction speed",
+                "Validation loss (intermediate losses)",
+                "Test error rate across multiple trials"
+              ],
+              "source": "repo"
+            },
+            {
+              "name": "exp__example_5_mnist",
+              "variables": {
+                "script": "build/lib/hpbandster/examples/example_5_mnist.py"
+              },
+              "run_command": "python build/lib/hpbandster/examples/example_5_mnist.py",
+              "code_refs": [
+                "build/lib/hpbandster/examples/example_5_mnist.py",
+                "README.md",
+                "build/lib/hpbandster/examples/example_1_local_sequential.py",
+                "build/lib/hpbandster/examples/example_2_local_parallel_threads.py"
+              ],
+              "verify": [
+                "exit_code:0",
+                "exists:results/hbo_baseline/experiments/example_5_mnist"
+              ],
+              "results_path": "results/hbo_baseline/experiments/example_5_mnist",
+              "metrics": [
+                "Test accuracy / validation loss reduction speed",
+                "Validation loss (intermediate losses)",
+                "Test error rate across multiple trials"
+              ],
+              "source": "repo"
+            }
+          ],
+          "planned_actions": "Edit in-file tunables when axes come from script scrape; do not invent CLI flags. Record dataset availability gaps in missing_context.",
+          "results_path": "results/hbo_baseline/experiments"
+        },
+        {
+          "phase_id": "summarize",
+          "title": "Aggregate results",
+          "goal": "Write/update summary.json aggregates from phase logs.",
+          "depends_on": [
+            "experiments"
+          ],
+          "variables": [],
+          "axes": {},
+          "run_template": "",
+          "matrix": [],
+          "planned_actions": "Collect metrics under results/hbo_baseline into results/hbo_baseline/summary.json; do not invent measured values.",
+          "results_path": "results/hbo_baseline/summary.json"
+        }
+      ],
+      "assumptions": [
+        "Scripts are self-contained and do not require external CLI flags beyond python invocation.",
+        "Metrics will be extracted automatically by the scripts into standard locations under results/hbo_baseline/."
+      ],
+      "constraints": [
+        "Do not invent files or CLI IDs outside this exploration.",
+        "Use only provided source excerpts for evidence lists.",
+        "Prefer compact axes + a few example matrix rows (run_command/code_refs/verify)."
+      ],
+      "missing_context": [
+        "setup phase rewritten to avoid venv-in-plan pattern; uses bare pip/python. Engineer creates a workspace-mounted .venv at runtime so installs persist across Docker containers.",
+        "Script tunables (dataset/method) were not scraped; confirm in-file defaults.",
+        "results_summary_path assumes repo creates summary.json; if not, Engineer will report 0 metrics captured unless per-row result artifacts under matrix results_path are readable."
+      ],
+      "verification_checks": [
+        "exit_code:0",
+        "exists:results/hbo_baseline/smoke",
+        "exists:results/hbo_baseline/experiments/*",
+        "exists:results/hbo_baseline/experiments/example_1_local_sequential",
+        "exists:results/hbo_baseline/experiments/example_2_local_parallel_threads",
+        "exists:results/hbo_baseline/experiments/example_3_local_parallel_processes",
+        "exists:results/hbo_baseline/experiments/example_4_cluster",
+        "exists:results/hbo_baseline/experiments/example_5_keras_worker",
+        "exists:results/hbo_baseline/experiments/example_5_mnist",
+        "entrypoint exists for each kept run_command",
+        "CLI flags documented in entrypoint argparse (when flags used)",
+        "manual OrderedDict / # set edits demoted to missing_context"
+      ],
+      "risks": [
+        "Scripts may fail if datasets are not present; handle missing context gracefully.",
+        "Cluster execution scripts require specific environment variables that might be absent.",
+        "In-file OrderedDict edits are required when scripts expose no CLI flags."
+      ],
+      "organization": [
+        "Sequential phases with hard dependencies (setup -> smoke -> experiments -> summarize)."
+      ],
+      "execution": [
+        "Follow phases in depends_on order.",
+        "Example run: python build/lib/hpbandster/examples/example_1_local_sequential.py"
+      ],
+      "repo_usage": [
+        "build/lib/hpbandster/examples/example_1_local_sequential.py",
+        "build/lib/hpbandster/examples/example_2_local_parallel_threads.py",
+        "build/lib/hpbandster/examples/example_3_local_parallel_processes.py",
+        "build/lib/hpbandster/examples/example_4_cluster.py",
+        "build/lib/hpbandster/examples/example_5_keras_worker.py",
+        "build/lib/hpbandster/examples/example_5_mnist.py",
+        "script:setup.py",
+        "script:build/lib/hpbandster/examples/example_1_local_sequential.py",
+        "script:build/lib/hpbandster/examples/example_2_local_parallel_threads.py",
+        "script:build/lib/hpbandster/examples/example_3_local_parallel_processes.py",
+        "script:build/lib/hpbandster/examples/example_4_cluster.py",
+        "script:build/lib/hpbandster/examples/example_5_keras_worker.py",
+        "test:tests/test_kernels.py",
+        "test:tests/test_config_generators.py",
+        "test:tests/test_kde.py",
+        "test:tests/test_result.py",
+        "test:tests/test_utils.py",
+        "test:tests/test_worker.py"
+      ],
+      "engineer_notes": [
+        "Ensure .venv is activated before running any python command.",
+        "Check README.md for specific dataset paths if not auto-detected."
+      ],
+      "results_summary_path": "results/hbo_baseline/summary.json"
+    }
+  }
+}

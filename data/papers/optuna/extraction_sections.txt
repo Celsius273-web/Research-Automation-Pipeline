@@ -1,0 +1,473 @@
+Paper: Optuna: A Next-generation Hyperparameter Optimization Framework
+ID:    optuna
+
+Section: Abstract
+
+{
+  "research_question": "",
+  "paper_overview": "Introduce new design criteria for next-gen hyperparameter optimization software (define-by-run API, efficient pruning/pruning strategies, versatile architecture) and present Optuna as the culmination of these efforts.",
+  "methodology": "Development of define-by-run programming, custom sampling algorithms, and a versatile architecture supporting distributed computing to interactive interfaces. Implementation details are elaborated in subsequent sections; abstract focuses on design philosophy and criteria.",
+  "datasets_or_benchmarks": [],
+  "variables": [
+    "parameter search space",
+    "sampling algorithm",
+    "pruning strategy"
+  ],
+  "hyperparameters": {},
+  "evaluation_metrics": [],
+  "reported_results": [],
+  "notes": "Abstract emphasizes the introduction of Optuna and its design criteria. No specific quantitative results or benchmarks are reported in this section; references to experimental results appear later."
+}
+
+Section: Method
+
+{
+  "research_question": "What is Optuna?",
+  "paper_overview": "Optuna is a next-generation hyperparameter optimization (HPO) framework that utilizes a 'define-by-run' API style, similar to modern deep learning frameworks like PyTorch and TensorFlow Eager. This design allows for highly modular programming where the search space can be constructed dynamically during execution.",
+  "methodology": "The core methodology of Optuna is based on its define-by-run architecture. Unlike traditional 'define-and-run' frameworks (like Hyperopt or SMAC) which separate network construction from evaluation into distinct phases, Optuna allows users to suggest hyperparameters and construct models within the same dynamic execution flow.\n\nKey features include:\n1. **Modular Programming**: Users can create independent functions for different components of their model (e.g., `create_model`, `create_optimizer`) that are called dynamically by an objective function based on suggestions from a trial object (`trial.suggest_int`, etc.).\n2. **Heterogeneous Parameter Spaces**: The framework easily handles scenarios where the structure itself is being optimized, such as choosing between different model types (Random Forest vs. MLP) or varying network depths and layer sizes dynamically.\n3. **Pruning Support**: It supports pruning to stop unpromising trials early.",
+  "datasets_or_benchmarks": [
+    "The paper does not introduce a new dataset but rather benchmarks Optuna against other frameworks (SMAC, GPyOpt, Hyperopt, etc.) using standard deep learning and hyperparameter optimization tasks. The examples provided in the text involve constructing Random Forest classifiers and Multi-Layer Perceptron (MLP) models.",
+    "Figure 3 demonstrates optimizing a heterogeneous space involving both Random Forests and MLPs.\n\nFigure 4 shows an example of simultaneously optimizing neural network topology (number of layers, units per layer) and SGD hyperparameters (learning rate, weight decay).",
+    "Table 1 compares Optuna's 'define-by-run' style against other frameworks sorted by API styles.",
+    "Table 2 provides a comparison matrix showing that Optuna supports Pruning, is Lightweight, Distributed, has a Dashboard, and is Open Source (OSS), unlike many of its predecessors."
+  ],
+  "variables": [
+    "trial: The central object in Optuna used to suggest hyperparameters.",
+    "suggest_int(): Suggests an integer value within a specified range.",
+    "suggest_categorical(): Suggests one category from a list.",
+    "suggest_loguniform(): Suggests a floating-point number sampled logarithmically uniformly between two values (e.g., for learning rates).",
+    "FixedTrial: A special class used during deployment to suggest the best-found hyperparameters instead of searching for new ones."
+  ],
+  "hyperparameters": {
+    "model_architecture_hyperparams": "Number of layers, number of units per layer.",
+    "optimizer_hyperparams": "Learning rate (lr), weight decay",
+    "classifier_type": "Random Forest vs. MLP"
+  },
+  "evaluation_metrics": [
+    "The primary metric for HPO is typically the validation loss or accuracy achieved by the model trained with suggested hyperparameters.",
+    "Optuna's effectiveness is evaluated through its ability to explore complex, heterogeneous parameter spaces and its ease of use (lightweight nature) compared to other frameworks."
+  ],
+  "reported_results": [
+    {
+      "benchmark": "Comparison against previous HPO frameworks",
+      "algorithm": "",
+      "metric_name": "Feature Support & Usability",
+      "value": "Optuna is highlighted as the only framework in Table 2 that supports all features: Pruning, Lightweight setup, Distributed execution, Dashboard visualization, and Open Source status.",
+      "source": "Table 2"
+    },
+    {
+      "benchmark": "Modularity demonstration",
+      "algorithm": "",
+      "metric_name": "Code Structure Complexity",
+      "value": "The paper demonstrates that Optuna allows users to write modular code (e.g., separate `create_model` and `create_optimizer` functions) which is independent of each other, facilitating easier maintenance and extension compared to monolithic define-and-run approaches.",
+      "source": "Figures 3 & 4"
+    }
+  ],
+  "notes": "- **Define-by-Run vs. Define-and-Run**: The paper emphasizes that Optuna follows the 'define-by-run' paradigm (imperative, dynamic), where computation happens as code is executed, allowing for flexible model construction during optimization.\n\n-**Deployment**: A unique feature mentioned is the `FixedTrial` class, which allows users to easily deploy models found by the optimizer without rewriting the objective function. The FixedTrial object suggests pre-defined parameters instead of searching."
+}
+
+Section: Experiments
+
+{
+  "research_question": "What are the key features and advantages of Optuna as a next-generation hyperparameter optimization framework?",
+  "paper_overview": "The paper introduces Optuna, an open-source Python-based hyperparameter optimization (HPO) library. It emphasizes scalability, versatility, ease of setup, and flexibility in storage backends.",
+  "methodology": "Optuna supports multiple built-in algorithms like TPE+CMA-ES mixture for black-box optimization. The framework allows users to switch between lightweight local setups using in-memory structures or distributed computations with relational databases (e.g., SQLite). It also integrates interactive tools such as Jupyter Notebook and a web dashboard.",
+  "datasets_or_benchmarks": [
+    "Black-box optimization test cases: 56 standard benchmarks",
+    "Neural network benchmark: AlexNet on the Street View House Numbers (SVHN) dataset",
+    "SMBO benchmarks"
+  ],
+  "variables": [
+    "Optimization algorithm type (TPE, CMA-ES, Random Search, Hyperopt, SMAC3, GPyOpt)",
+    "Number of workers in distributed computation",
+    "Pruning enabled/disabled",
+    "Storage backend configuration",
+    "number of trials per study",
+    "average test errors",
+    "optimization score",
+    "execution time",
+    "parallelization efficiency"
+  ],
+  "hyperparameters": {
+    "sampling_algorithm_mixture": "TPE for first 40 steps + CMA-ES thereafter (for TPE+CMA-ES)",
+    "trial_limit_per_study": "80 trials used as evaluation metric in performance tests",
+    "number_of_repetitions_for_statistical_significance": "30 repetitions per algorithm/test case",
+    "sampling_algorithm": "TPE, Random Search",
+    "pruning_enabled": "True/False",
+    "distributed_workers": "[1, 2, 4, 8]"
+  },
+  "evaluation_metrics": [
+    "Best attained objective value (loss/error) after a fixed number of trials",
+    "Computational time spent per trial and total study duration",
+    "Number of pruned vs. completed trials under pruning strategies",
+    "Statistical significance via Paired Mann-Whitney U test with \u03b1 = 0.0005",
+    "trials per study",
+    "average test error",
+    "optimization score vs. time"
+  ],
+  "reported_results": [
+    {
+      "benchmark": "Black-box optimization (56 tests)",
+      "algorithm": "",
+      "metric_name": "Best attained objective value",
+      "value": "TPE+CMA-ES outperformed random search in 55/56 cases, Hyperopt in 55/56, and SMAC3 in 53/56. GPyOpt was better only on 22/56 tests but took ~20x longer per trial.",
+      "source": "Figure 9"
+    },
+    {
+      "benchmark": "Black-box optimization (all cases)",
+      "algorithm": "",
+      "metric_name": "Average computational time",
+      "value": "TPE+CMA-ES, Hyperopt, SMAC3, and random search completed studies in seconds; GPyOpt took ~20x longer.",
+      "source": "Figure 10"
+    },
+    {
+      "benchmark": "AlexNet on SVHN with pruning",
+      "algorithm": "",
+      "metric_name": "Average number of trials explored within time limit (4 hours)",
+      "value": "TPE without pruning: ~35.8 trials; TPE with pruning: ~1278.6 trials (of which 1271.5 were pruned).",
+      "source": "Figure 11a"
+    },
+    {
+      "benchmark": "AlexNet on SVHN with random search and pruning",
+      "algorithm": "",
+      "metric_name": "Average number of trials explored within time limit (4 hours)",
+      "value": "Random search without pruning: ~36.0 trials; Random search with pruning: ~1119.3 trials (of which 1111.3 were pruned).",
+      "source": "Figure 11a"
+    },
+    {
+      "benchmark": "SMBO Study (General)",
+      "algorithm": "",
+      "metric_name": "Trials completed without pruning (TPE)",
+      "value": "35.8",
+      "source": "Text, Section 5.2"
+    },
+    {
+      "benchmark": "SMBO Study (General)",
+      "algorithm": "",
+      "metric_name": "Trials completed without pruning (Random Search)",
+      "value": "36.0",
+      "source": "Text, Section 5.2"
+    },
+    {
+      "benchmark": "SMBO Study (Pruned TPE)",
+      "algorithm": "",
+      "metric_name": "Total trials explored per study",
+      "value": "1278.6",
+      "source": "Text, Section 5.2"
+    },
+    {
+      "benchmark": "SMBO Study (Pruned TPE)",
+      "algorithm": "",
+      "metric_name": "Trials pruned during process",
+      "value": "1271.5",
+      "source": "Text, Section 5.2"
+    },
+    {
+      "benchmark": "SMBO Study (Pruned Random Search)",
+      "algorithm": "",
+      "metric_name": "Total trials explored per study",
+      "value": "1119.3",
+      "source": "Text, Section 5.2"
+    },
+    {
+      "benchmark": "SMBO Study (Pruned Random Search)",
+      "algorithm": "",
+      "metric_name": "Trials pruned during process",
+      "value": "1111.3",
+      "source": "Text, Section 5.2"
+    }
+  ],
+  "notes": "- Optuna's ASHA-based pruning significantly outperforms Median pruning from Vizier.\n- The TPE+CMA-ES mixture is highlighted as a cost-effective choice for most scenarios, while GPyOpt may be preferred when evaluation time is not critical and higher accuracy is needed.\nResults extracted from text descriptions in Sections 5.2 and 5.3 regarding trial counts and pruning statistics."
+}
+
+Section: Hyperparameters
+
+{
+  "research_question": "",
+  "paper_overview": "",
+  "methodology": "Uses Optuna framework with ASHA pruning to optimize RocksDB parameters (34 out of >100) and FFmpeg encoding parameters. Minimizes computation time for file operations and reconstruction error respectively.",
+  "datasets_or_benchmarks": [
+    "SVHN",
+    "Blender Open Movie Project ('Buck Bunny')"
+  ],
+  "variables": [
+    "number of workers",
+    "pruning mechanism (ASHA vs median)",
+    "parameter set size",
+    "computation time",
+    "reconstruction error"
+  ],
+  "hyperparameters": {
+    "framework": "Optuna",
+    "search_algorithm": "TPE, Random Search",
+    "pruner_type": "ASHA, Median Pruning",
+    "num_workers_variable": "Variable (tested effect)",
+    "parameter_space_size_rocksdb": "{34}",
+    "total_customizable_params_rocksdb": ">100"
+  },
+  "evaluation_metrics": [
+    "computation time (seconds)",
+    "number of explored parameter sets",
+    "test error"
+  ],
+  "reported_results": [
+    {
+      "benchmark": "RocksDB File Operations",
+      "algorithm": "",
+      "metric_name": "Computation Time (Default)",
+      "value": "372.0",
+      "source": "Text description"
+    },
+    {
+      "benchmark": "RocksDB File Operations",
+      "algorithm": "",
+      "metric_name": "Computation Time (Optimized with Pruning)",
+      "value": "30.0",
+      "source": "Text description"
+    },
+    {
+      "benchmark": "RocksDB File Operations",
+      "algorithm": "",
+      "metric_name": "Parameter Sets Explored (4 hours, with pruning)",
+      "value": "937",
+      "source": "Text description"
+    },
+    {
+      "benchmark": "RocksDB File Operations",
+      "algorithm": "",
+      "metric_name": "Parameter Sets Explored (4 hours, without pruning)",
+      "value": "39.0",
+      "source": "Text description"
+    }
+  ],
+  "notes": "Results extracted from text describing RocksDB and FFmpeg experiments. Figure captions mention test error transitions but specific numerical values for those figures are not provided in the text snippet."
+}
+
+Section: Appendix
+
+{
+  "research_question": "What is the primary distinction between 'Define-and-Run' and 'Define-by-Run' styles in deep learning frameworks, as presented in Table 1?",
+  "paper_overview": "The paper introduces Optuna, a next-generation hyperparameter optimization framework. It categorizes existing software into two main API styles: Define-and-Run (symbolic/static) and Define-by-Run (imperative/dynamic).",
+  "methodology": "Table 1 in the document lists various deep learning frameworks and hyperparameter optimization tools, sorting them by their respective API styles.",
+  "datasets_or_benchmarks": [
+    "Open Images Challenge V4"
+  ],
+  "variables": [
+    "Framework Name (e.g., PyTorch, TensorFlow)",
+    "API Style Category ('Define-and-Run' vs. 'Define-by-Run')",
+    "Year of Release"
+  ],
+  "hyperparameters": {
+    "framework_type": "Deep Learning Framework or Hyperparameter Optimization Tool",
+    "style_category": "Symbolic/Static (Define-and-Run) or Imperative/Dynamic (Define-by-Run)"
+  },
+  "evaluation_metrics": [
+    "API Style Classification"
+  ],
+  "reported_results": [
+    {
+      "benchmark": "Table 1: Software frameworks for deep learning and hyperparameter optimization",
+      "algorithm": "",
+      "metric_name": "Style Category",
+      "value": "Define-and-Run (symbolic, static)",
+      "source": "Detected table (page 3, #1)"
+    },
+    {
+      "benchmark": "Table 1: Software frameworks for deep learning and hyperparameter optimization",
+      "algorithm": "",
+      "metric_name": "Style Category",
+      "value": "Define-by-Run Style (imperative, dynamic)",
+      "source": "Detected table (page 3, #1)"
+    }
+  ],
+  "notes": "The primary distinction lies in how the computational graph is handled. 'Define-and-Run' frameworks typically use a symbolic approach where the computation graph is defined before execution and remains static during training ('static'). In contrast, 'Define-by-Run' (or imperative) frameworks build the computation graph dynamically as operations are executed within code loops or conditionals."
+}
+
+=== Merged ===
+
+{
+  "research_question": "How can we address: Introduce new design criteria for next-gen hyperparameter optimization software (define-by-run API, efficient pruning/pruning strategies, versatile architecture) and present Optuna as the culmination of these efforts.",
+  "paper_overview": "Introduce new design criteria for next-gen hyperparameter optimization software (define-by-run API, efficient pruning/pruning strategies, versatile architecture) and present Optuna as the culmination of these efforts.",
+  "methodology": "Development of define-by-run programming, custom sampling algorithms, and a versatile architecture supporting distributed computing to interactive interfaces. Implementation details are elaborated in subsequent sections; abstract focuses on design philosophy and criteria.",
+  "datasets_or_benchmarks": [
+    "The paper does not introduce a new dataset but rather benchmarks Optuna against other frameworks (SMAC, GPyOpt, Hyperopt, etc.) using standard deep learning and hyperparameter optimization tasks. The examples provided in the text involve constructing Random Forest classifiers and Multi-Layer Perceptron (MLP) models.",
+    "Figure 3 demonstrates optimizing a heterogeneous space involving both Random Forests and MLPs.\n\nFigure 4 shows an example of simultaneously optimizing neural network topology (number of layers, units per layer) and SGD hyperparameters (learning rate, weight decay).",
+    "Table 1 compares Optuna's 'define-by-run' style against other frameworks sorted by API styles.",
+    "Table 2 provides a comparison matrix showing that Optuna supports Pruning, is Lightweight, Distributed, has a Dashboard, and is Open Source (OSS), unlike many of its predecessors.",
+    "Black-box optimization test cases: 56 standard benchmarks",
+    "Neural network benchmark: AlexNet on the Street View House Numbers (SVHN) dataset",
+    "SMBO benchmarks",
+    "SVHN",
+    "Blender Open Movie Project ('Buck Bunny')",
+    "Open Images Challenge V4"
+  ],
+  "variables": [
+    "parameter search space",
+    "sampling algorithm",
+    "pruning strategy",
+    "trial: The central object in Optuna used to suggest hyperparameters.",
+    "suggest_int(): Suggests an integer value within a specified range.",
+    "suggest_categorical(): Suggests one category from a list.",
+    "suggest_loguniform(): Suggests a floating-point number sampled logarithmically uniformly between two values (e.g., for learning rates).",
+    "FixedTrial: A special class used during deployment to suggest the best-found hyperparameters instead of searching for new ones.",
+    "Optimization algorithm type (TPE, CMA-ES, Random Search, Hyperopt, SMAC3, GPyOpt)",
+    "Number of workers in distributed computation",
+    "Pruning enabled/disabled",
+    "Storage backend configuration",
+    "number of trials per study",
+    "average test errors",
+    "optimization score",
+    "execution time",
+    "parallelization efficiency",
+    "number of workers",
+    "pruning mechanism (ASHA vs median)",
+    "parameter set size",
+    "computation time",
+    "reconstruction error",
+    "Framework Name (e.g., PyTorch, TensorFlow)",
+    "API Style Category ('Define-and-Run' vs. 'Define-by-Run')",
+    "Year of Release"
+  ],
+  "hyperparameters": {
+    "model_architecture_hyperparams": "Number of layers, number of units per layer.",
+    "optimizer_hyperparams": "Learning rate (lr), weight decay",
+    "classifier_type": "Random Forest vs. MLP",
+    "sampling_algorithm_mixture": "TPE for first 40 steps + CMA-ES thereafter (for TPE+CMA-ES)",
+    "trial_limit_per_study": "80 trials used as evaluation metric in performance tests",
+    "number_of_repetitions_for_statistical_significance": "30 repetitions per algorithm/test case",
+    "sampling_algorithm": "TPE, Random Search",
+    "pruning_enabled": "True/False",
+    "distributed_workers": "[1, 2, 4, 8]",
+    "framework": "Optuna",
+    "search_algorithm": "TPE, Random Search",
+    "pruner_type": "ASHA, Median Pruning",
+    "num_workers_variable": "Variable (tested effect)",
+    "parameter_space_size_rocksdb": "{34}",
+    "total_customizable_params_rocksdb": ">100",
+    "framework_type": "Deep Learning Framework or Hyperparameter Optimization Tool",
+    "style_category": "Symbolic/Static (Define-and-Run) or Imperative/Dynamic (Define-by-Run)"
+  },
+  "evaluation_metrics": [
+    "The primary metric for HPO is typically the validation loss or accuracy achieved by the model trained with suggested hyperparameters.",
+    "Optuna's effectiveness is evaluated through its ability to explore complex, heterogeneous parameter spaces and its ease of use (lightweight nature) compared to other frameworks.",
+    "Best attained objective value (loss/error) after a fixed number of trials",
+    "Computational time spent per trial and total study duration",
+    "Number of pruned vs. completed trials under pruning strategies",
+    "Statistical significance via Paired Mann-Whitney U test with \u03b1 = 0.0005",
+    "trials per study",
+    "average test error",
+    "optimization score vs. time",
+    "computation time (seconds)",
+    "number of explored parameter sets",
+    "test error",
+    "API Style Classification"
+  ],
+  "reported_results": [
+    {
+      "benchmark": "Comparison against previous HPO frameworks",
+      "algorithm": "",
+      "metric_name": "Feature Support & Usability",
+      "value": "Optuna is highlighted as the only framework in Table 2 that supports all features: Pruning, Lightweight setup, Distributed execution, Dashboard visualization, and Open Source status.",
+      "source": "Table 2"
+    },
+    {
+      "benchmark": "Black-box optimization (56 tests)",
+      "algorithm": "",
+      "metric_name": "Best attained objective value",
+      "value": "TPE+CMA-ES outperformed random search in 55/56 cases, Hyperopt in 55/56, and SMAC3 in 53/56. GPyOpt was better only on 22/56 tests but took ~20x longer per trial.",
+      "source": "Figure 9"
+    },
+    {
+      "benchmark": "Black-box optimization (all cases)",
+      "algorithm": "",
+      "metric_name": "Average computational time",
+      "value": "TPE+CMA-ES, Hyperopt, SMAC3, and random search completed studies in seconds; GPyOpt took ~20x longer.",
+      "source": "Figure 10"
+    },
+    {
+      "benchmark": "AlexNet on SVHN with pruning",
+      "algorithm": "",
+      "metric_name": "Average number of trials explored within time limit (4 hours)",
+      "value": "TPE without pruning: ~35.8 trials; TPE with pruning: ~1278.6 trials (of which 1271.5 were pruned).",
+      "source": "Figure 11a"
+    },
+    {
+      "benchmark": "AlexNet on SVHN with random search and pruning",
+      "algorithm": "",
+      "metric_name": "Average number of trials explored within time limit (4 hours)",
+      "value": "Random search without pruning: ~36.0 trials; Random search with pruning: ~1119.3 trials (of which 1111.3 were pruned).",
+      "source": "Figure 11a"
+    },
+    {
+      "benchmark": "SMBO Study (General)",
+      "algorithm": "",
+      "metric_name": "Trials completed without pruning (TPE)",
+      "value": "35.8",
+      "source": "Text, Section 5.2"
+    },
+    {
+      "benchmark": "SMBO Study (General)",
+      "algorithm": "",
+      "metric_name": "Trials completed without pruning (Random Search)",
+      "value": "36.0",
+      "source": "Text, Section 5.2"
+    },
+    {
+      "benchmark": "SMBO Study (Pruned TPE)",
+      "algorithm": "",
+      "metric_name": "Total trials explored per study",
+      "value": "1278.6",
+      "source": "Text, Section 5.2"
+    },
+    {
+      "benchmark": "SMBO Study (Pruned TPE)",
+      "algorithm": "",
+      "metric_name": "Trials pruned during process",
+      "value": "1271.5",
+      "source": "Text, Section 5.2"
+    },
+    {
+      "benchmark": "SMBO Study (Pruned Random Search)",
+      "algorithm": "",
+      "metric_name": "Total trials explored per study",
+      "value": "1119.3",
+      "source": "Text, Section 5.2"
+    },
+    {
+      "benchmark": "SMBO Study (Pruned Random Search)",
+      "algorithm": "",
+      "metric_name": "Trials pruned during process",
+      "value": "1111.3",
+      "source": "Text, Section 5.2"
+    },
+    {
+      "benchmark": "RocksDB File Operations",
+      "algorithm": "",
+      "metric_name": "Computation Time (Default)",
+      "value": "372.0",
+      "source": "Text description"
+    },
+    {
+      "benchmark": "RocksDB File Operations",
+      "algorithm": "",
+      "metric_name": "Computation Time (Optimized with Pruning)",
+      "value": "30.0",
+      "source": "Text description"
+    },
+    {
+      "benchmark": "RocksDB File Operations",
+      "algorithm": "",
+      "metric_name": "Parameter Sets Explored (4 hours, with pruning)",
+      "value": "937",
+      "source": "Text description"
+    },
+    {
+      "benchmark": "RocksDB File Operations",
+      "algorithm": "",
+      "metric_name": "Parameter Sets Explored (4 hours, without pruning)",
+      "value": "39.0",
+      "source": "Text description"
+    }
+  ],
+  "notes": "Abstract emphasizes the introduction of Optuna and its design criteria. No specific quantitative results or benchmarks are reported in this section; references to experimental results appear later.\n- **Define-by-Run vs. Define-and-Run**: The paper emphasizes that Optuna follows the 'define-by-run' paradigm (imperative, dynamic), where computation happens as code is executed, allowing for flexible model construction during optimization.\n\n-**Deployment**: A unique feature mentioned is the `FixedTrial` class, which allows users to easily deploy models found by the optimizer without rewriting the objective function. The FixedTrial object suggests pre-defined parameters instead of searching.\n- Optuna's ASHA-based pruning significantly outperforms Median pruning from Vizier.\n- The TPE+CMA-ES mixture is highlighted as a cost-effective choice for most scenarios, while GPyOpt may be preferred when evaluation time is not critical and higher accuracy is needed.\nResults extracted from text descriptions in Sections 5.2 and 5.3 regarding trial counts and pruning statistics.\nResults extracted from text describing RocksDB and FFmpeg experiments. Figure captions mention test error transitions but specific numerical values for those figures are not provided in the text snippet.\nThe primary distinction lies in how the computational graph is handled. 'Define-and-Run' frameworks typically use a symbolic approach where the computation graph is defined before execution and remains static during training ('static'). In contrast, 'Define-by-Run' (or imperative) frameworks build the computation graph dynamically as operations are executed within code loops or conditionals.\n[inferred] research_question synthesized from paper_overview"
+}

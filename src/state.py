@@ -110,6 +110,11 @@ class SectionExtraction(BaseModel):
 
 
 class ExtractionBundle(BaseModel):
+    """Container for analyst extraction output: per-section extractions plus merged synthesis.
+    
+    by_section: mapping of section names to their individual SectionExtraction results.
+    merged: unified SectionExtraction synthesized across all sections.
+    """
     by_section: dict[str, SectionExtraction] = Field(default_factory=dict)
     merged: SectionExtraction = Field(default_factory=SectionExtraction)
 

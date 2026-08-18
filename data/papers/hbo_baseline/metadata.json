@@ -1,0 +1,14 @@
+{
+  "paper_id": "hbo_baseline",
+  "title": "hbo_baseline",
+  "arxiv_id": null,
+  "repo_url": "https://github.com/automl/HpBandSter.git",
+  "pdf_checksum": "81b7aa7f62d5bdaf0636c938fa726b92b748e24053aca76adb13bd6cc0681c70",
+  "ingested_at": "2026-08-11T11:13:18.479201",
+  "repo_commit_sha": "0ec0ce23448ae7f27c0868b35a7086bc6d0fba2a",
+  "bundle_structure": {
+    "paper.pdf": "Original paper PDF",
+    "code/": "Cloned repository (if repo_url provided)",
+    "metadata.json": "This metadata file"
+  }
+}
