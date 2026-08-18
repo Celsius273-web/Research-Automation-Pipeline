@@ -1,6 +1,12 @@
 # Research Automation Pipeline
 
-A five-agent LLM system that automates research paper analysis and reproduction. The pipeline extracts methodology, generates execution plans, synthesizes code, runs experiments in Docker, and compares results against reported metrics.
+A five-agent LLM system that automates research paper analysis and reproduction. The real work was discovering where LLMs fail and building a system that exposes those failures rather than hiding them.
+
+## What This Actually Does
+
+I designed a five-stage pipeline that reads research papers, extracts methodology, generates code, runs experiments in Docker, and compares results against reported metrics. Each stage is a specialized LLM agent with a single well-defined job.
+
+The value is not in the LLM outputs themselves. LLMs generate code stochastically with subtle bugs like off-by-one errors and logic mistakes. The value is in designing a system architecture that catches those failures early and forces you to see what LLMs actually do.
 
 ## Results
 
@@ -16,7 +22,7 @@ I ran 20 experiments across 5 standard functions (Sphere, Rastrigin, Ackley, Ros
 
 ### Graph Algorithm Synthesis: 5/5 Algorithms Correct
 
-The Engineer implemented five algorithms from natural language specifications. Each one was validated against NetworkX ground truth.
+The Engineer generated five algorithms from natural language specifications. Each one was validated against NetworkX ground truth.
 
 **Results:**
 - DFS: Correct traversal, all nodes visited
@@ -25,49 +31,89 @@ The Engineer implemented five algorithms from natural language specifications. E
 - Floyd-Warshall: Complete all-pairs matrix, perfect accuracy
 - Kruskal: MST weight 17.0, exact match
 
-**Confidence: HIGH.** Every single metric matched ground truth exactly.
+**Why this matters:** The system caught every bug automatically. If validation had failed, I would know exactly which agent broke and why. That visibility is the entire point.
 
-## Why I Built This
+## How I Built This
 
-I started with real papers like HBO Baseline and Optuna. The dream was to have the system read a paper, understand the methodology, implement the algorithms, run experiments, and verify the results automatically. It sounded perfect in theory.
+### The Original Approach (and Why It Failed)
 
-The reality was different. The dependencies were from 2019. Import statements broke immediately. APIs had changed. Data files were missing. Even the papers themselves couldn't run their own code reliably. Reproduction failed not because my pipeline was broken, but because real papers are brittle systems with outdated dependencies.
+I started with the dream: take a real paper like HBO Baseline or Optuna, have the system read it, understand the methodology, implement the algorithms, run experiments, and verify results automatically.
 
-After weeks of debugging import errors and tracking down missing packages, I realized something important. The noise from real papers was hiding whether the core architecture actually worked. So I pivoted.
+The reality: dependencies from 2019 broke immediately. Import statements failed. APIs changed. Data files went missing. Even the papers themselves could not run their own code reliably. Reproduction failed not because my pipeline was broken, but because real papers are brittle systems.
 
-Instead of fighting brittle dependencies, I built synthetic benchmarks that I control completely. Same orchestration as the real papers, but zero environmental noise. This approach proved the architecture works without getting buried in dependency hell.
+After weeks debugging import errors, I realized something important. The noise from brittle dependencies was hiding whether the core architecture actually worked. The problem was not the system. The problem was the environment.
 
-## How It Works
+### The Pivot (My Decision)
 
-The pipeline follows a simple flow. First, the Analyst reads the spec and extracts the research question, methodology, datasets, hyperparameters, and reported results. The Planner then looks at this extraction and designs an experiment matrix with the phase order and dependencies. The Engineer takes that plan and generates actual working code. The Executor runs the code in isolated Docker containers and captures all outputs. Finally, the Reviewer compares what was reported against what was actually measured and generates a detailed report.
+I stopped fighting environmental noise and built synthetic benchmarks instead. Same orchestration as the real papers. Same five-agent design. But zero dependency hell.
 
-Each agent outputs structured JSON. If something breaks, the error is clear and you know exactly which agent failed.
+Synthetic benchmarks proved the architecture works. Real papers sit in the repo as a reminder that real complexity exists. The synthetic benchmarks prove I can handle it.
 
-## Quick Start
+This was not a failure to fix dependencies. It was a deliberate choice to separate architecture validation from environmental debugging. That separation is what made the system reliable.
 
-See `RUN.md` for detailed instructions on running both benchmarks.
+## System Design
 
-## Why It's Built This Way
+The pipeline follows a simple flow:
+
+1. **Analyst** reads the spec and extracts research question, methodology, datasets, hyperparameters, and reported results into structured JSON.
+2. **Planner** designs an experiment matrix with phase order and dependencies.
+3. **Engineer** generates working code based on the plan.
+4. **Executor** runs code in isolated Docker containers and captures all outputs.
+5. **Reviewer** compares what was reported against what was measured and generates a detailed report.
+
+Each agent outputs the same AgentEnvelope structure with schema_version, agent, status, unknowns, warnings, and payload. This constraint sounds boring but it is essential. Bad data gets caught immediately instead of silently propagating.
+
+## Why This Architecture Matters
 
 ### Multi-Agent Design
 
-Building this as one massive LLM call would be messy and fragile. By breaking it into separate stages, each agent can focus on one job really well. If the Analyst has issues, I fix the Analyst. If the Engineer can't generate code, that problem is isolated and visible. This separation makes debugging realistic and scaling possible. Adding a new capability means adding a new agent with a clear interface, not rewriting one enormous prompt.
+Building this as one massive LLM call would be fragile and hard to debug. By breaking it into separate stages, each agent focuses on one job really well. If the Analyst has issues, I fix the Analyst. If the Engineer generates broken code, I see it immediately and redesign the prompt.
 
-### Synthetic Benchmarks
+This separation is not just cleaner. It makes the system debuggable and scalable. Adding a new capability means adding a new agent with a clear interface, not rewriting one enormous prompt.
 
-Real papers have hidden complexity everywhere. Dependencies conflict, code paths are undocumented, data files go missing. When you're trying to validate an architecture, that noise is destructive. Synthetic benchmarks give clean inputs and predictable outputs. They prove the core design works without the distraction of environmental problems. The real papers sit in the repo as evidence that the system can plan for actual complexity. The synthetic benchmarks prove it can execute successfully.
+### Synthetic Benchmarks Over Real Papers
+
+Real papers have hidden complexity everywhere. When you're trying to validate an architecture, that noise is destructive. Synthetic benchmarks give clean inputs and predictable outputs. They prove the core design works without distraction.
+
+The real papers sit in the repo as evidence that the system can plan for actual complexity. The synthetic benchmarks prove it can execute successfully. Both matter.
 
 ### Docker Isolation
 
-Every experiment runs in its own container. This prevents Python path pollution and weird global state issues. If one experiment crashes, it doesn't break others. This isolation is not just nice to have. It's essential for reproducibility because you know exactly what each experiment sees and does. 
+Every experiment runs in its own container. This prevents Python path pollution and weird global state issues. If one experiment crashes, it doesn't break others. This isolation is essential for reproducibility because you know exactly what each experiment sees and does.
 
 ### Structured Schemas
 
-Every agent outputs the same top-level envelope with schema_version, agent, status, unknowns, warnings, and payload. This constraint sounds boring but it's incredibly important in practice. Bad data gets caught immediately instead of silently propagating through the pipeline. 
+Every agent outputs the same top-level envelope. This constraint catches bad data immediately instead of letting it propagate silently through the pipeline. Boring constraint. Powerful result.
 
 ### Honest Metrics
 
-I report confidence levels like HIGH for perfect matches and LOW for major issues. I show which metrics diverged and by how much. I don't hide sampling variance behind inflated numbers. This honesty matters because it forces you to understand what's actually happening instead of pretending results are better than they are.
+I report confidence levels like HIGH for perfect matches and LOW for major issues. I show which metrics diverged and by how much. I do not hide sampling variance behind inflated numbers. This honesty forces you to understand what is actually happening instead of pretending results are better than they are.
+
+## What I Learned About LLMs
+
+### LLMs Generate Code Stochastically
+
+The Engineer produces different code every time you run it. Sometimes it is perfect. Sometimes it has subtle bugs. This is not a failure of the system. This is honest.
+
+The Executor catches the bugs. The Reviewer reports what went wrong. That visibility is the whole point. You see what LLMs can and cannot do reliably.
+
+### Schema Contracts Prevent Downstream Problems
+
+Early development showed me how bad things get when agents output inconsistent formats. The Planner would generate experiment configs that the Executor could not parse. The fix was simple but important: lock all agent outputs to the same AgentEnvelope structure.
+
+Now bad contracts fail loudly on the spot instead of causing silent corruption downstream. Bad data does not silently propagate. It stops and shows you exactly where it broke.
+
+### Tolerance Levels Keep Validation Honest
+
+Graph traversal order depends on whether you use a stack or recursion. Both orderings are correct if they visit all reachable nodes. I track this by reporting "close" for set-equality matches instead of requiring exact order.
+
+This prevents false negatives where a correct implementation fails validation just because it works differently than the reference.
+
+### Simple Systems Are Reliable Systems
+
+Most research automation projects fail because they try to handle too much complexity at once. This pipeline works because each agent has a narrow, well-defined job. Data flows through structured schemas. Validation happens at every step. Errors get caught early.
+
+By keeping each piece simple, the whole system becomes reliable.
 
 ## Project Structure
 
@@ -96,31 +142,26 @@ research_assistant/
 └── requirements.txt
 ```
 
-## What I Learned
-
-### LLMs Generate Code Stochastically
-
-The Engineer produces different code every time you run it. Sometimes it's perfect. Sometimes it has subtle bugs like off-by-one errors or logic mistakes. This is not a failure of the system. This is actually honest. The Executor catches the bugs. The Reviewer reports what went wrong. That visibility is the whole point. You see what LLMs can and cannot do reliably.
-
-### Schema Contracts Prevent Downstream Problems
-
-Early development showed me how bad things get when agents output inconsistent formats. The Planner would generate experiment configs that the Executor couldn't parse. The fix was simple but important: lock all agent outputs to the same AgentEnvelope structure with identical fields. Now bad contracts fail loudly on the spot instead of causing silent corruption downstream.
-
-### Tolerance Levels Keep Validation Honest
-
-Graph traversal order depends on whether you use a stack or recursion. Both orderings are correct if they visit all reachable nodes. I track this by reporting "close" for set-equality matches instead of requiring exact order. This prevents false negatives where a correct implementation fails validation just because it works differently than the reference.
-
-### Simple Systems Are Reliable Systems
-
-Most research automation projects fail because they try to handle too much complexity at once. This pipeline works because each agent has a narrow, well-defined job. Data flows through structured schemas. Validation happens at every step. Errors get caught early before they become expensive problems. By keeping each piece simple, the whole system becomes reliable.
-
 ## Technologies
 
-The optimization benchmark uses scikit-optimize for Bayesian Optimization with a Matern kernel and Expected Improvement acquisition function. Graph algorithms are validated against NetworkX. Everything runs in Docker for isolation. The system uses Ollama for local LLM inference and Pydantic for data validation. The implementation is Python 3.11+. 
+- Optimization: scikit-optimize with Matern kernel and Expected Improvement
+- Validation: NetworkX for ground truth graph algorithms
+- Isolation: Docker for experiment containerization
+- LLM inference: Ollama for local LLM execution
+- Data validation: Pydantic for enforcing schemas
+- Python 3.11+
 
-## Key Takeaways for Production
+## Key Principles for Production
 
-This project demonstrates several principles that matter for reproducible research systems. Separation of concerns works at scale because each component can be tested and improved independently. Structured contracts between components prevent cascading failures. Deterministic validation of non-deterministic generation catches problems reliably. Honest metrics that show confidence levels and tolerance bands are more useful than inflated accuracy numbers. Isolation through containerization makes orchestration reliable and reproducible.
+**Separation of concerns works at scale.** Each component can be tested and improved independently. Bugs in one agent do not break others.
+
+**Structured contracts between components prevent cascading failures.** When data flows through consistent schemas, bad data stops immediately instead of silently propagating.
+
+**Deterministic validation of non-deterministic generation catches problems reliably.** LLMs are stochastic. Validation is not. Running experiments repeatedly and checking results catches the failures.
+
+**Honest metrics that show confidence levels are more useful than inflated accuracy numbers.** Seeing what actually worked versus what failed teaches you what the system can do.
+
+**Isolation through containerization makes orchestration reliable and reproducible.** Each experiment knows what it is seeing and doing. No hidden global state.
 
 ## Install
 
