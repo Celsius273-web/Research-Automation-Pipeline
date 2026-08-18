@@ -116,15 +116,11 @@ Most research automation projects fail because they try to handle too much compl
 
 ## Technologies
 
-The optimization benchmark uses scikit-optimize for Bayesian Optimization with a Matern kernel and Expected Improvement acquisition function. Graph algorithms are validated against NetworkX. Everything runs in Docker for isolation. The system uses Ollama for local LLM inference and Pydantic for data validation. The implementation is Python 3.11+.
+The optimization benchmark uses scikit-optimize for Bayesian Optimization with a Matern kernel and Expected Improvement acquisition function. Graph algorithms are validated against NetworkX. Everything runs in Docker for isolation. The system uses Ollama for local LLM inference and Pydantic for data validation. The implementation is Python 3.11+. 
 
 ## Key Takeaways for Production
 
 This project demonstrates several principles that matter for reproducible research systems. Separation of concerns works at scale because each component can be tested and improved independently. Structured contracts between components prevent cascading failures. Deterministic validation of non-deterministic generation catches problems reliably. Honest metrics that show confidence levels and tolerance bands are more useful than inflated accuracy numbers. Isolation through containerization makes orchestration reliable and reproducible.
-
-## What's Next
-
-The real papers in the repo show that the system can handle planning for complex papers with real methodology and datasets. The synthetic benchmarks prove it can execute end-to-end without environmental noise. Combining both approaches requires solving the dependency management problem, which is separate from the pipeline architecture itself.
 
 ## Install
 
